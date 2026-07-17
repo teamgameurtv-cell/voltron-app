@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../screens/splash_screen.dart';
 import '../screens/login_screen.dart';
 import '../screens/signup_screen.dart';
+import '../screens/reset_password_screen.dart';
 import '../screens/home/accueil_screen.dart';
 import '../screens/home/home_shell.dart';
 import '../screens/shop/shop_screen.dart';
@@ -55,6 +56,10 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: '/signup',
       builder: (context, state) => const SignupScreen(),
+    ),
+    GoRoute(
+      path: '/reset-password',
+      builder: (context, state) => const ResetPasswordScreen(),
     ),
     StatefulShellRoute.indexedStack(
       builder: (context, state, navigationShell) =>

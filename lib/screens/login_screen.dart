@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../providers/auth_provider.dart';
 import '../theme/voltron_theme.dart';
 
@@ -117,11 +118,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       );
                       return;
                     }
-                    await ref.read(supabaseProvider).auth.resetPasswordForEmail(_emailController.text.trim());
-                    if (!context.mounted) return;
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('E-mail de réinitialisation envoyé')),
-                    );
+                    try {
+                      await ref.read(supabaseProvider).auth.resetPasswordForEmail(
+                            _emailController.text.trim(),
+                            redirectTo: '${Uri.base.origin}${Uri.base.path}#/reset-password',
+                          );
+                      if (!context.mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('E-mail de réinitialisation envoyé')),
+                      );
+                    } on AuthException catch (e) {
+                      if (!context.mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+                    }
                   },
                   child: const Text(
                     'Mot de passe oublié ?',

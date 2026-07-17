@@ -11,6 +11,11 @@ Future<void> main() async {
     url: SupabaseConfig.url,
     publishableKey: SupabaseConfig.publishableKey,
   );
+  Supabase.instance.client.auth.onAuthStateChange.listen((data) {
+    if (data.event == AuthChangeEvent.passwordRecovery) {
+      appRouter.go('/reset-password');
+    }
+  });
   runApp(const ProviderScope(child: VoltronApp()));
 }
 

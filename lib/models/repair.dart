@@ -3,13 +3,45 @@ class RepairService {
   final String name;
   final String duration;
   final String priceLabel;
+  final String? description;
+  final String? imageUrl;
 
   const RepairService({
     required this.id,
     required this.name,
     required this.duration,
     required this.priceLabel,
+    this.description,
+    this.imageUrl,
   });
+
+  RepairService copyWith({
+    String? name,
+    String? duration,
+    String? priceLabel,
+    String? description,
+    String? imageUrl,
+  }) {
+    return RepairService(
+      id: id,
+      name: name ?? this.name,
+      duration: duration ?? this.duration,
+      priceLabel: priceLabel ?? this.priceLabel,
+      description: description ?? this.description,
+      imageUrl: imageUrl ?? this.imageUrl,
+    );
+  }
+
+  factory RepairService.fromMap(Map<String, dynamic> map) {
+    return RepairService(
+      id: map['id'] as String,
+      name: map['name'] as String,
+      duration: map['duration'] as String? ?? '',
+      priceLabel: map['price_label'] as String? ?? '',
+      description: map['description'] as String?,
+      imageUrl: map['image_url'] as String?,
+    );
+  }
 }
 
 enum RepairStepStatus { done, current, pending }

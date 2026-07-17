@@ -32,10 +32,12 @@ class Product {
   final int reviewCount;
   final IconData icon;
   final String? tagline;
+  final String? description;
   final List<ProductSpec> specs;
   final List<Color> colors;
   final bool isBestSeller;
   final int stock;
+  final String? imageUrl;
 
   const Product({
     required this.id,
@@ -46,10 +48,12 @@ class Product {
     this.reviewCount = 0,
     required this.icon,
     this.tagline,
+    this.description,
     this.specs = const [],
     this.colors = const [],
     this.isBestSeller = false,
     this.stock = 0,
+    this.imageUrl,
   });
 
   String get formattedPrice =>
@@ -61,6 +65,8 @@ class Product {
     double? price,
     int? stock,
     bool? isBestSeller,
+    String? imageUrl,
+    String? description,
   }) {
     return Product(
       id: id,
@@ -71,10 +77,12 @@ class Product {
       reviewCount: reviewCount,
       icon: icon,
       tagline: tagline,
+      description: description ?? this.description,
       specs: specs,
       colors: colors,
       isBestSeller: isBestSeller ?? this.isBestSeller,
       stock: stock ?? this.stock,
+      imageUrl: imageUrl ?? this.imageUrl,
     );
   }
 
@@ -88,8 +96,10 @@ class Product {
       reviewCount: map['review_count'] as int? ?? 0,
       icon: iconForName(map['icon_name'] as String? ?? 'shopping_bag'),
       tagline: map['tagline'] as String?,
+      description: map['description'] as String?,
       isBestSeller: map['is_best_seller'] as bool? ?? false,
       stock: map['stock'] as int? ?? 0,
+      imageUrl: map['image_url'] as String?,
     );
   }
 }

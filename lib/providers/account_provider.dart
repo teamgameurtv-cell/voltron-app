@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/account_models.dart';
@@ -25,6 +26,21 @@ class ProfileNotifier extends StateNotifier<UserProfile> {
       if (email != null) 'email': email,
       if (phone != null) 'phone': phone,
     }).eq('id', userId);
+  }
+
+  /// Envoie la photo de profil choisie dans le stockage Supabase et l'associe au compte.
+  Future<void> updateAvatar(Uint8List bytes, String fileExtension) async {
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) return;
+    final path = '$userId/avatar.$fileExtension';
+    await _client.storage.from('avatars').uploadBinary(
+          path,
+          bytes,
+          fileOptions: const FileOptions(upsert: true),
+        );
+    final url = _client.storage.from('avatars').getPublicUrl(path);
+    await _client.from('profiles').update({'avatar_url': '$url?t=${DateTime.now().millisecondsSinceEpoch}'}).eq(
+        'id', userId);
   }
 
   @override

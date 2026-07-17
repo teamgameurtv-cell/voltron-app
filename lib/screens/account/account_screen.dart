@@ -1,3 +1,4 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -5,6 +6,7 @@ import '../../providers/account_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/subscription_provider.dart';
 import '../../theme/voltron_theme.dart';
+import '../../widgets/client_avatar.dart';
 
 class _AccountMenuItem {
   final String label;
@@ -42,14 +44,48 @@ class AccountScreen extends ConsumerWidget {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
           children: [
-            const Text('COMPTE', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+            Row(
+              children: [
+                Image.asset('assets/images/voltron_logo.png', width: 32),
+                const SizedBox(width: 10),
+                const Text('COMPTE', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+              ],
+            ),
             const SizedBox(height: 20),
             Row(
               children: [
-                const CircleAvatar(
-                  radius: 28,
-                  backgroundColor: VoltronColors.cardBlack,
-                  child: Icon(Icons.person, color: VoltronColors.greyText, size: 28),
+                GestureDetector(
+                  onTap: () async {
+                    final result = await FilePicker.platform.pickFiles(
+                      type: FileType.image,
+                      withData: true,
+                    );
+                    final file = result?.files.firstOrNull;
+                    if (file?.bytes == null) return;
+                    final ext = file!.extension ?? 'jpg';
+                    await ref.read(profileProvider.notifier).updateAvatar(file.bytes!, ext);
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Photo de profil mise à jour')),
+                    );
+                  },
+                  child: Stack(
+                    children: [
+                      ClientAvatar(avatarUrl: profile.avatarUrl, radius: 28),
+                      Positioned(
+                        right: 0,
+                        bottom: 0,
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: const BoxDecoration(
+                            color: VoltronColors.electricYellow,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.camera_alt_rounded, size: 12, color: VoltronColors.deepBlack),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
                 const SizedBox(width: 14),
                 Expanded(

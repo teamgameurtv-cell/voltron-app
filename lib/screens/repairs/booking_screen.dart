@@ -1,14 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../data/mock_repairs.dart';
 import '../../models/repair.dart';
 import '../../providers/account_provider.dart';
 import '../../providers/bookings_provider.dart';
+import '../../providers/repair_services_provider.dart';
 import '../../theme/voltron_theme.dart';
 
 const List<String> _stepLabels = ['Service', 'Date & heure', 'Vos informations', 'Confirmation'];
 const List<String> _timeSlots = ['09:00', '10:00', '11:00', '14:00', '15:00', '16:00', '17:00'];
+const List<String> _weekdayInitials = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
+const List<String> _monthNames = [
+  'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
+  'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre',
+];
+
+bool _isSameDay(DateTime a, DateTime b) => a.year == b.year && a.month == b.month && a.day == b.day;
+
+String _formatDay(DateTime day) => '${day.day} ${_monthNames[day.month - 1]} ${day.year}';
 
 class BookingScreen extends ConsumerStatefulWidget {
   const BookingScreen({super.key});
@@ -20,7 +29,8 @@ class BookingScreen extends ConsumerStatefulWidget {
 class _BookingScreenState extends ConsumerState<BookingScreen> {
   int _step = 0;
   RepairService? _service;
-  int? _selectedDay;
+  DateTime? _selectedDay;
+  DateTime _visibleMonth = DateTime(DateTime.now().year, DateTime.now().month);
   String? _selectedTime;
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
@@ -53,7 +63,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
       await ref.read(bookingsProvider.notifier).add(
             serviceName: _service?.name ?? '-',
             clientName: _nameController.text.trim().isNotEmpty ? _nameController.text.trim() : 'Client',
-            day: _selectedDay != null ? 'Juin $_selectedDay' : '-',
+            day: _selectedDay != null ? _formatDay(_selectedDay!) : '-',
             time: _selectedTime ?? '-',
           );
       if (!mounted) return;
@@ -122,8 +132,10 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
         );
       case 1:
         return _DateTimeStep(
+          visibleMonth: _visibleMonth,
           selectedDay: _selectedDay,
           selectedTime: _selectedTime,
+          onMonthChanged: (m) => setState(() => _visibleMonth = m),
           onDaySelected: (d) => setState(() => _selectedDay = d),
           onTimeSelected: (t) => setState(() => _selectedTime = t),
         );
@@ -192,20 +204,21 @@ class _StepperHeader extends StatelessWidget {
   }
 }
 
-class _ServiceStep extends StatelessWidget {
+class _ServiceStep extends ConsumerWidget {
   final RepairService? selected;
   final ValueChanged<RepairService> onSelect;
 
   const _ServiceStep({required this.selected, required this.onSelect});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final services = ref.watch(repairServicesProvider);
     return ListView(
       children: [
         const Text('Choisissez votre service',
             style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
         const SizedBox(height: 12),
-        ...mockRepairServices.map((service) {
+        ...services.map((service) {
           final isSelected = service.id == selected?.id;
           return Container(
             margin: const EdgeInsets.only(bottom: 10),
@@ -216,10 +229,33 @@ class _ServiceStep extends StatelessWidget {
             ),
             child: ListTile(
               onTap: () => onSelect(service),
+              leading: (service.imageUrl != null && service.imageUrl!.isNotEmpty)
+                  ? ClipRRect(
+                      borderRadius: BorderRadius.circular(VoltronRadii.sm),
+                      child: Image.network(service.imageUrl!, width: 44, height: 44, fit: BoxFit.cover),
+                    )
+                  : const CircleAvatar(
+                      backgroundColor: VoltronColors.deepBlack,
+                      child: Icon(Icons.build_rounded, color: VoltronColors.electricYellow, size: 18),
+                    ),
               title: Text(service.name, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
-              subtitle: service.duration.isNotEmpty
-                  ? Text(service.duration, style: const TextStyle(color: VoltronColors.greyText, fontSize: 11))
-                  : null,
+              subtitle: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (service.duration.isNotEmpty)
+                    Text(service.duration, style: const TextStyle(color: VoltronColors.greyText, fontSize: 11)),
+                  if ((service.description ?? '').isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text(
+                        service.description!,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(color: VoltronColors.greyText, fontSize: 11),
+                      ),
+                    ),
+                ],
+              ),
               trailing: Text(service.priceLabel,
                   style: const TextStyle(color: VoltronColors.electricYellow, fontSize: 12, fontWeight: FontWeight.w700)),
             ),
@@ -231,54 +267,117 @@ class _ServiceStep extends StatelessWidget {
 }
 
 class _DateTimeStep extends StatelessWidget {
-  final int? selectedDay;
+  final DateTime visibleMonth;
+  final DateTime? selectedDay;
   final String? selectedTime;
-  final ValueChanged<int> onDaySelected;
+  final ValueChanged<DateTime> onMonthChanged;
+  final ValueChanged<DateTime> onDaySelected;
   final ValueChanged<String> onTimeSelected;
 
   const _DateTimeStep({
+    required this.visibleMonth,
     required this.selectedDay,
     required this.selectedTime,
+    required this.onMonthChanged,
     required this.onDaySelected,
     required this.onTimeSelected,
   });
 
   @override
   Widget build(BuildContext context) {
+    final today = DateTime.now();
+    final todayNormalized = DateTime(today.year, today.month, today.day);
+    final currentMonth = DateTime(today.year, today.month);
+    final daysInMonth = DateTime(visibleMonth.year, visibleMonth.month + 1, 0).day;
+    final firstWeekday = DateTime(visibleMonth.year, visibleMonth.month, 1).weekday; // 1 = Monday
+
     return ListView(
       children: [
         const Text('Choisissez une date',
             style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
         const SizedBox(height: 12),
-        SizedBox(
-          height: 64,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            itemCount: 30,
-            separatorBuilder: (_, __) => const SizedBox(width: 8),
-            itemBuilder: (context, index) {
-              final day = index + 1;
-              final isSelected = day == selectedDay;
-              return GestureDetector(
-                onTap: () => onDaySelected(day),
-                child: Container(
-                  width: 48,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: isSelected ? VoltronColors.electricYellow : VoltronColors.cardBlack,
-                    borderRadius: BorderRadius.circular(VoltronRadii.sm),
-                  ),
-                  child: Text(
-                    '$day',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      color: isSelected ? VoltronColors.deepBlack : Colors.white,
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            IconButton(
+              onPressed: visibleMonth.isAfter(currentMonth)
+                  ? () => onMonthChanged(DateTime(visibleMonth.year, visibleMonth.month - 1))
+                  : null,
+              icon: const Icon(Icons.chevron_left_rounded),
+              color: Colors.white,
+            ),
+            Text(
+              '${_monthNames[visibleMonth.month - 1]} ${visibleMonth.year}',
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+            ),
+            IconButton(
+              onPressed: () => onMonthChanged(DateTime(visibleMonth.year, visibleMonth.month + 1)),
+              icon: const Icon(Icons.chevron_right_rounded),
+              color: Colors.white,
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        Row(
+          children: _weekdayInitials
+              .map((w) => Expanded(
+                    child: Center(
+                      child: Text(w, style: const TextStyle(color: VoltronColors.greyText, fontSize: 11)),
                     ),
-                  ),
-                ),
-              );
-            },
+                  ))
+              .toList(),
+        ),
+        const SizedBox(height: 4),
+        GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          padding: EdgeInsets.zero,
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 7,
+            mainAxisSpacing: 4,
+            crossAxisSpacing: 4,
           ),
+          itemCount: firstWeekday - 1 + daysInMonth,
+          itemBuilder: (context, index) {
+            if (index < firstWeekday - 1) return const SizedBox.shrink();
+            final day = index - (firstWeekday - 1) + 1;
+            final date = DateTime(visibleMonth.year, visibleMonth.month, day);
+            final isPast = date.isBefore(todayNormalized);
+            final isToday = _isSameDay(date, todayNormalized);
+            final isSelected = selectedDay != null && _isSameDay(date, selectedDay!);
+            return GestureDetector(
+              onTap: isPast ? null : () => onDaySelected(date),
+              child: Container(
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: isSelected ? VoltronColors.electricYellow : Colors.transparent,
+                  borderRadius: BorderRadius.circular(VoltronRadii.sm),
+                ),
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Text(
+                      '$day',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: isSelected
+                            ? VoltronColors.deepBlack
+                            : isPast
+                                ? VoltronColors.greyText.withValues(alpha: 0.4)
+                                : Colors.white,
+                      ),
+                    ),
+                    if (isToday && !isSelected)
+                      const Positioned(
+                        bottom: 4,
+                        child: CircleAvatar(radius: 2, backgroundColor: VoltronColors.electricBlueGlow),
+                      ),
+                  ],
+                ),
+              ),
+            );
+          },
         ),
         const SizedBox(height: 20),
         const Text('Heures disponibles',
@@ -353,7 +452,7 @@ class _InfoStep extends StatelessWidget {
 
 class _ConfirmationStep extends StatelessWidget {
   final RepairService? service;
-  final int? day;
+  final DateTime? day;
   final String? time;
   final String name;
 
@@ -381,7 +480,7 @@ class _ConfirmationStep extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _SummaryRow('Service', service?.name ?? '-'),
-              _SummaryRow('Date', day != null ? 'Juin ${day.toString()}' : '-'),
+              _SummaryRow('Date', day != null ? _formatDay(day!) : '-'),
               _SummaryRow('Heure', time ?? '-'),
               _SummaryRow('Client', name.isNotEmpty ? name : '-'),
               _SummaryRow('Prix', service?.priceLabel ?? '-'),

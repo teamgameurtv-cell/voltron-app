@@ -26,6 +26,10 @@ class VoltronCareScreen extends ConsumerWidget {
         child: ListView(
           padding: const EdgeInsets.all(20),
           children: [
+            Center(
+              child: Image.asset('assets/images/voltron_logo.png', width: 110),
+            ),
+            const SizedBox(height: 20),
             if (activePlan != null) ...[
               Container(
                 padding: const EdgeInsets.all(16),

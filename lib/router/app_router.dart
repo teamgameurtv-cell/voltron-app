@@ -37,6 +37,7 @@ import '../screens/admin/admin_repairs_screen.dart';
 import '../screens/admin/admin_clients_screen.dart';
 import '../screens/admin/admin_announcements_screen.dart';
 import '../screens/admin/admin_repairs_board_screen.dart';
+import '../screens/admin/admin_services_screen.dart';
 import '../screens/notifications/notifications_screen.dart';
 
 final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -233,6 +234,10 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: '/admin/repairs-board',
       builder: (context, state) => const AdminRepairsBoardScreen(),
+    ),
+    GoRoute(
+      path: '/admin/services',
+      builder: (context, state) => const AdminServicesScreen(),
     ),
     GoRoute(
       path: '/notifications',

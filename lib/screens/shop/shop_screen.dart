@@ -6,6 +6,7 @@ import '../../models/product.dart';
 import '../../providers/cart_provider.dart';
 import '../../providers/catalog_provider.dart';
 import '../../theme/voltron_theme.dart';
+import '../../widgets/product_visual.dart';
 
 class ShopScreen extends ConsumerStatefulWidget {
   const ShopScreen({super.key});
@@ -54,6 +55,8 @@ class _ShopScreenState extends ConsumerState<ShopScreen> {
           children: [
             Row(
               children: [
+                Image.asset('assets/images/voltron_logo.png', width: 32),
+                const SizedBox(width: 10),
                 const Expanded(
                   child: Text(
                     'BOUTIQUE',
@@ -243,7 +246,7 @@ class _FeaturedBanner extends StatelessWidget {
               style: const TextStyle(color: VoltronColors.greyText, fontSize: 12),
             ),
             const SizedBox(height: 16),
-            Icon(product.icon, size: 64, color: VoltronColors.electricYellow),
+            ProductVisual(product: product, size: 64, iconSize: 64),
             const SizedBox(height: 12),
             ElevatedButton(
               onPressed: () => context.push('/shop/product/${product.id}'),
@@ -333,7 +336,7 @@ class _ProductCard extends StatelessWidget {
             Stack(
               children: [
                 Center(
-                  child: Icon(product.icon, size: 40, color: VoltronColors.electricYellow),
+                  child: ProductVisual(product: product, size: 40, iconSize: 40),
                 ),
                 if (product.stock > 0 && product.stock <= 5)
                   Positioned(

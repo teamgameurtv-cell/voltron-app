@@ -6,6 +6,7 @@ import '../../providers/cart_provider.dart';
 import '../../providers/catalog_provider.dart';
 import '../../providers/notifications_provider.dart';
 import '../../theme/voltron_theme.dart';
+import '../../widgets/product_visual.dart';
 
 enum _DeliveryMode { livraison, retrait }
 
@@ -74,7 +75,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                                   color: VoltronColors.deepBlack,
                                   borderRadius: BorderRadius.circular(VoltronRadii.sm),
                                 ),
-                                child: Icon(item.product.icon, color: VoltronColors.electricYellow),
+                                child: ProductVisual(product: item.product, size: 52, iconSize: 26),
                               ),
                               const SizedBox(width: 12),
                               Expanded(
@@ -141,7 +142,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                                   ),
                                   child: Row(
                                     children: [
-                                      Icon(product.icon, color: VoltronColors.electricYellow, size: 28),
+                                      ProductVisual(product: product, size: 40, iconSize: 28),
                                       const SizedBox(width: 8),
                                       Expanded(
                                         child: Column(

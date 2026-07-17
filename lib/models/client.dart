@@ -4,6 +4,7 @@ class Client {
   final String email;
   final String phone;
   final int loyaltyPoints;
+  final String? avatarUrl;
 
   const Client({
     required this.id,
@@ -11,6 +12,7 @@ class Client {
     required this.email,
     required this.phone,
     required this.loyaltyPoints,
+    this.avatarUrl,
   });
 
   factory Client.fromMap(Map<String, dynamic> map) {
@@ -20,6 +22,7 @@ class Client {
       email: map['email'] as String? ?? '',
       phone: map['phone'] as String? ?? '',
       loyaltyPoints: map['loyalty_points'] as int? ?? 0,
+      avatarUrl: map['avatar_url'] as String?,
     );
   }
 }

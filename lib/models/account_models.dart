@@ -3,15 +3,23 @@ class UserProfile {
   final String email;
   final String phone;
   final int loyaltyPoints;
+  final String? avatarUrl;
 
-  const UserProfile({required this.name, required this.email, required this.phone, this.loyaltyPoints = 0});
+  const UserProfile({
+    required this.name,
+    required this.email,
+    required this.phone,
+    this.loyaltyPoints = 0,
+    this.avatarUrl,
+  });
 
-  UserProfile copyWith({String? name, String? email, String? phone}) {
+  UserProfile copyWith({String? name, String? email, String? phone, String? avatarUrl}) {
     return UserProfile(
       name: name ?? this.name,
       email: email ?? this.email,
       phone: phone ?? this.phone,
       loyaltyPoints: loyaltyPoints,
+      avatarUrl: avatarUrl ?? this.avatarUrl,
     );
   }
 
@@ -21,6 +29,7 @@ class UserProfile {
       email: map['email'] as String? ?? '',
       phone: map['phone'] as String? ?? '',
       loyaltyPoints: map['loyalty_points'] as int? ?? 0,
+      avatarUrl: map['avatar_url'] as String?,
     );
   }
 }

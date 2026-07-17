@@ -66,6 +66,13 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              Center(
+                child: Image.asset(
+                  'assets/images/voltron_logo.png',
+                  width: 140,
+                ),
+              ),
+              const SizedBox(height: 28),
               TextField(
                 controller: _nameController,
                 style: const TextStyle(color: Colors.white),

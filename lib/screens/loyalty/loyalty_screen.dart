@@ -2,16 +2,119 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/account_provider.dart';
+import '../../providers/auth_provider.dart';
+import '../../providers/garage_provider.dart';
+import '../../providers/loyalty_goals_provider.dart';
 import '../../providers/rewards_provider.dart';
+import '../../providers/subscription_provider.dart';
 import '../../theme/voltron_theme.dart';
+
+class _LoyaltyGoal {
+  final String id;
+  final String title;
+  final String subtitle;
+  final int points;
+  final IconData icon;
+  final bool manual;
+
+  const _LoyaltyGoal({
+    required this.id,
+    required this.title,
+    required this.subtitle,
+    required this.points,
+    required this.icon,
+    this.manual = false,
+  });
+}
+
+const List<_LoyaltyGoal> _loyaltyGoals = [
+  _LoyaltyGoal(
+    id: 'phone_added',
+    title: 'Ajoute ton numéro de téléphone',
+    subtitle: 'Renseigne-le dans Mes informations',
+    points: 20,
+    icon: Icons.phone_iphone_rounded,
+  ),
+  _LoyaltyGoal(
+    id: 'email_confirmed',
+    title: 'Confirme ton adresse e-mail',
+    subtitle: 'Valide le lien reçu à l\'inscription',
+    points: 20,
+    icon: Icons.mark_email_read_outlined,
+  ),
+  _LoyaltyGoal(
+    id: 'avatar_added',
+    title: 'Ajoute une photo de profil',
+    subtitle: 'Personnalise ton compte',
+    points: 15,
+    icon: Icons.account_circle_outlined,
+  ),
+  _LoyaltyGoal(
+    id: 'vehicle_added',
+    title: 'Enregistre un véhicule',
+    subtitle: 'Ajoute ta trottinette dans Mon Garage',
+    points: 20,
+    icon: Icons.electric_scooter_rounded,
+  ),
+  _LoyaltyGoal(
+    id: 'first_purchase',
+    title: 'Passe ta première commande',
+    subtitle: 'Achète un article dans la boutique',
+    points: 30,
+    icon: Icons.shopping_bag_outlined,
+  ),
+  _LoyaltyGoal(
+    id: 'care_subscribed',
+    title: 'Abonne-toi à Voltron Care',
+    subtitle: 'Entretien serein toute l\'année',
+    points: 30,
+    icon: Icons.verified_rounded,
+  ),
+  _LoyaltyGoal(
+    id: 'instagram_follow',
+    title: 'Suis notre compte Instagram',
+    subtitle: 'Reviens ici réclamer tes points une fois abonné',
+    points: 20,
+    icon: Icons.camera_alt_outlined,
+    manual: true,
+  ),
+];
 
 class LoyaltyScreen extends ConsumerWidget {
   const LoyaltyScreen({super.key});
+
+  bool _isEligible(String goalId, WidgetRef ref) {
+    switch (goalId) {
+      case 'phone_added':
+        return ref.watch(profileProvider).phone.trim().isNotEmpty;
+      case 'email_confirmed':
+        return ref.watch(currentUserProvider)?.emailConfirmedAt != null;
+      case 'avatar_added':
+        return (ref.watch(profileProvider).avatarUrl ?? '').isNotEmpty;
+      case 'vehicle_added':
+        return ref.watch(garageProvider).isNotEmpty;
+      case 'first_purchase':
+        return ref.watch(invoicesProvider).valueOrNull?.isNotEmpty ?? false;
+      case 'care_subscribed':
+        return ref.watch(subscriptionProvider) != null;
+      default:
+        return false;
+    }
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final rewards = ref.watch(rewardsProvider);
     final loyaltyPoints = ref.watch(profileProvider).loyaltyPoints;
+    final claimedGoals = ref.watch(claimedLoyaltyGoalsProvider).valueOrNull ?? {};
+
+    for (final goal in _loyaltyGoals) {
+      if (!goal.manual && !claimedGoals.contains(goal.id) && _isEligible(goal.id, ref)) {
+        Future.microtask(() => ref.read(loyaltyGoalsNotifierProvider).claim(goal.id, goal.points));
+      }
+    }
+    final completedCount = _loyaltyGoals.where((g) => claimedGoals.contains(g.id)).length;
+
     return Scaffold(
       backgroundColor: VoltronColors.deepBlack,
       body: SafeArea(
@@ -54,6 +157,96 @@ class LoyaltyScreen extends ConsumerWidget {
                 ],
               ),
             ),
+            const SizedBox(height: 24),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('OBJECTIFS',
+                    style: TextStyle(fontSize: 12, letterSpacing: 1, fontWeight: FontWeight.w700, color: VoltronColors.greyText)),
+                Text('$completedCount/${_loyaltyGoals.length} complétés',
+                    style: const TextStyle(fontSize: 11, color: VoltronColors.greyText)),
+              ],
+            ),
+            const SizedBox(height: 10),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(VoltronRadii.pill),
+              child: LinearProgressIndicator(
+                value: completedCount / _loyaltyGoals.length,
+                minHeight: 8,
+                backgroundColor: VoltronColors.cardBlack,
+                valueColor: const AlwaysStoppedAnimation(VoltronColors.electricYellow),
+              ),
+            ),
+            const SizedBox(height: 14),
+            ..._loyaltyGoals.map((goal) {
+              final isDone = claimedGoals.contains(goal.id);
+              return Container(
+                margin: const EdgeInsets.only(bottom: 10),
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: VoltronColors.cardBlack,
+                  borderRadius: BorderRadius.circular(VoltronRadii.md),
+                  border: Border.all(color: isDone ? VoltronColors.success.withValues(alpha: 0.5) : Colors.transparent),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: VoltronColors.deepBlack,
+                        borderRadius: BorderRadius.circular(VoltronRadii.sm),
+                      ),
+                      child: Icon(
+                        isDone ? Icons.check_rounded : goal.icon,
+                        color: isDone ? VoltronColors.success : VoltronColors.electricYellow,
+                        size: 20,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(goal.title,
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 13,
+                                decoration: isDone ? TextDecoration.lineThrough : null,
+                                color: isDone ? VoltronColors.greyText : Colors.white,
+                              )),
+                          const SizedBox(height: 2),
+                          Text(goal.subtitle, style: const TextStyle(color: VoltronColors.greyText, fontSize: 11)),
+                        ],
+                      ),
+                    ),
+                    if (isDone)
+                      const Icon(Icons.check_circle_rounded, color: VoltronColors.success, size: 20)
+                    else if (goal.manual)
+                      TextButton(
+                        style: TextButton.styleFrom(
+                          backgroundColor: VoltronColors.electricYellow,
+                          foregroundColor: VoltronColors.deepBlack,
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(VoltronRadii.pill)),
+                        ),
+                        onPressed: () async {
+                          final credited = await ref.read(loyaltyGoalsNotifierProvider).claim(goal.id, goal.points);
+                          if (!context.mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text(credited ? '+${goal.points} points crédités !' : 'Déjà réclamé')),
+                          );
+                        },
+                        child: Text('+${goal.points} pts', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
+                      )
+                    else
+                      Text('+${goal.points} pts',
+                          style: const TextStyle(color: VoltronColors.electricYellow, fontSize: 12, fontWeight: FontWeight.w700)),
+                  ],
+                ),
+              );
+            }),
             const SizedBox(height: 24),
             const Text('RÉCOMPENSES DISPONIBLES',
                 style: TextStyle(fontSize: 12, letterSpacing: 1, fontWeight: FontWeight.w700, color: VoltronColors.greyText)),

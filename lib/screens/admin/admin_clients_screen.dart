@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../data/mock_repairs.dart';
 import '../../models/client.dart';
 import '../../models/repair.dart';
 import '../../models/scooter.dart';
 import '../../providers/admin_crm_provider.dart';
+import '../../providers/repair_services_provider.dart';
 import '../../providers/repairs_provider.dart';
 import '../../theme/voltron_theme.dart';
+import '../../widgets/client_avatar.dart';
 import 'admin_shell.dart';
 
 class AdminClientsScreen extends ConsumerStatefulWidget {
@@ -74,11 +75,7 @@ class _AdminClientsScreenState extends ConsumerState<AdminClientsScreen> {
                               padding: const EdgeInsets.all(12),
                               child: Row(
                                 children: [
-                                  const CircleAvatar(
-                                    radius: 16,
-                                    backgroundColor: VoltronColors.deepBlack,
-                                    child: Icon(Icons.person, size: 16, color: VoltronColors.greyText),
-                                  ),
+                                  ClientAvatar(avatarUrl: client.avatarUrl, radius: 16),
                                   const SizedBox(width: 10),
                                   Expanded(
                                     child: Column(
@@ -128,6 +125,7 @@ class _ClientDetail extends ConsumerWidget {
     final clientsAsync = ref.watch(clientSearchProvider(''));
     final scootersAsync = ref.watch(clientScootersProvider(clientId));
     final invoicesAsync = ref.watch(clientInvoicesProvider(clientId));
+    final services = ref.watch(repairServicesProvider);
 
     return clientsAsync.when(
       loading: () => const Center(child: CircularProgressIndicator(color: VoltronColors.electricYellow)),
@@ -141,6 +139,8 @@ class _ClientDetail extends ConsumerWidget {
           children: [
             Row(
               children: [
+                ClientAvatar(avatarUrl: client.avatarUrl, radius: 26),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -162,7 +162,9 @@ class _ClientDetail extends ConsumerWidget {
                 ),
                 const SizedBox(width: 10),
                 ElevatedButton.icon(
-                  onPressed: scooters.isEmpty ? null : () => _openRepairDialog(context, ref, client, scooters),
+                  onPressed: scooters.isEmpty || services.isEmpty
+                      ? null
+                      : () => _openRepairDialog(context, ref, client, scooters, services),
                   icon: const Icon(Icons.build_rounded, size: 16),
                   label: const Text('OUVRIR UN DOSSIER'),
                 ),
@@ -214,9 +216,15 @@ class _ClientDetail extends ConsumerWidget {
     );
   }
 
-  void _openRepairDialog(BuildContext context, WidgetRef ref, Client client, List<OwnedScooter> scooters) {
+  void _openRepairDialog(
+    BuildContext context,
+    WidgetRef ref,
+    Client client,
+    List<OwnedScooter> scooters,
+    List<RepairService> services,
+  ) {
     OwnedScooter selectedScooter = scooters.first;
-    RepairService selectedService = mockRepairServices.first;
+    RepairService selectedService = services.first;
 
     showDialog(
       context: context,
@@ -241,7 +249,7 @@ class _ClientDetail extends ConsumerWidget {
                 DropdownButtonFormField<RepairService>(
                   value: selectedService,
                   dropdownColor: VoltronColors.cardBlack,
-                  items: mockRepairServices
+                  items: services
                       .map((s) => DropdownMenuItem(value: s, child: Text(s.name)))
                       .toList(),
                   onChanged: (s) => setDialogState(() => selectedService = s!),

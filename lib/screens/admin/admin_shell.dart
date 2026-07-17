@@ -11,6 +11,7 @@ enum AdminSection {
   bookings,
   repairs,
   repairsBoard,
+  services,
   announcements,
 }
 
@@ -29,6 +30,7 @@ const List<_NavItem> _navItems = [
   _NavItem(AdminSection.bookings, 'Réservations', Icons.calendar_month_rounded, '/admin/bookings'),
   _NavItem(AdminSection.repairs, 'Réparations', Icons.build_rounded, '/admin/repairs'),
   _NavItem(AdminSection.repairsBoard, 'Suivi réparations', Icons.view_kanban_rounded, '/admin/repairs-board'),
+  _NavItem(AdminSection.services, 'Services & tarifs', Icons.handyman_rounded, '/admin/services'),
   _NavItem(AdminSection.products, 'Produits', Icons.storefront_rounded, '/admin/products'),
   _NavItem(AdminSection.stock, 'Stock', Icons.inventory_2_rounded, '/admin/stock'),
   _NavItem(AdminSection.rewards, 'Fidélité', Icons.star_rounded, '/admin/rewards'),
@@ -113,18 +115,12 @@ class _Sidebar extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const Padding(
-            padding: EdgeInsets.fromLTRB(20, 24, 20, 24),
+            padding: EdgeInsets.fromLTRB(20, 24, 20, 20),
             child: Row(
               children: [
-                Icon(Icons.electric_scooter_rounded, color: VoltronColors.electricYellow, size: 28),
+                Image(image: AssetImage('assets/images/voltron_logo.png'), width: 40),
                 SizedBox(width: 10),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('VOLTRON', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
-                    Text('ADMIN', style: TextStyle(color: VoltronColors.greyText, fontSize: 10, letterSpacing: 2)),
-                  ],
-                ),
+                Text('ADMIN', style: TextStyle(color: VoltronColors.greyText, fontSize: 10, letterSpacing: 2)),
               ],
             ),
           ),

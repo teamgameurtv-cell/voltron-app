@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -44,6 +45,8 @@ class CatalogNotifier extends StateNotifier<List<Product>> {
     required double price,
     required int stock,
     IconData icon = Icons.shopping_bag_rounded,
+    String? imageUrl,
+    String? description,
   }) async {
     await _client.from('products').insert({
       'name': name,
@@ -51,6 +54,8 @@ class CatalogNotifier extends StateNotifier<List<Product>> {
       'price': price,
       'stock': stock,
       'icon_name': nameForIcon(icon),
+      'image_url': imageUrl,
+      'description': description,
     });
   }
 
@@ -61,7 +66,20 @@ class CatalogNotifier extends StateNotifier<List<Product>> {
       'price': product.price,
       'stock': product.stock,
       'is_best_seller': product.isBestSeller,
+      'image_url': product.imageUrl,
+      'description': product.description,
     }).eq('id', product.id);
+  }
+
+  /// Envoie l'image choisie dans le stockage Supabase et retourne son URL publique.
+  Future<String> uploadProductImage(Uint8List bytes, String fileName) async {
+    final path = '${DateTime.now().millisecondsSinceEpoch}_$fileName';
+    await _client.storage.from('product-images').uploadBinary(
+          path,
+          bytes,
+          fileOptions: const FileOptions(upsert: true),
+        );
+    return _client.storage.from('product-images').getPublicUrl(path);
   }
 
   Future<void> removeProduct(String id) async {

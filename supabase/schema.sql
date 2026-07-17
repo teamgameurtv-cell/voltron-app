@@ -318,3 +318,147 @@ select * from (values
   ('Accessoire offert', 300, 'lock_open')
 ) as v(label, points, icon_name)
 where not exists (select 1 from rewards);
+
+-- ============ PHOTOS PRODUITS (colonne + bucket de stockage) ============
+alter table products add column if not exists image_url text;
+alter table products add column if not exists description text;
+
+insert into storage.buckets (id, name, public)
+select 'product-images', 'product-images', true
+where not exists (select 1 from storage.buckets where id = 'product-images');
+
+drop policy if exists "product images public read" on storage.objects;
+create policy "product images public read" on storage.objects
+  for select using (bucket_id = 'product-images');
+
+drop policy if exists "product images admin write" on storage.objects;
+create policy "product images admin write" on storage.objects
+  for insert with check (bucket_id = 'product-images' and is_admin());
+
+drop policy if exists "product images admin update" on storage.objects;
+create policy "product images admin update" on storage.objects
+  for update using (bucket_id = 'product-images' and is_admin());
+
+drop policy if exists "product images admin delete" on storage.objects;
+create policy "product images admin delete" on storage.objects
+  for delete using (bucket_id = 'product-images' and is_admin());
+
+-- ============ PHOTOS DE PROFIL CLIENT (colonne + bucket de stockage) ============
+alter table profiles add column if not exists avatar_url text;
+
+insert into storage.buckets (id, name, public)
+select 'avatars', 'avatars', true
+where not exists (select 1 from storage.buckets where id = 'avatars');
+
+drop policy if exists "avatars public read" on storage.objects;
+create policy "avatars public read" on storage.objects
+  for select using (bucket_id = 'avatars');
+
+drop policy if exists "avatars owner write" on storage.objects;
+create policy "avatars owner write" on storage.objects
+  for insert with check (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text);
+
+drop policy if exists "avatars owner update" on storage.objects;
+create policy "avatars owner update" on storage.objects
+  for update using (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text);
+
+drop policy if exists "avatars owner delete" on storage.objects;
+create policy "avatars owner delete" on storage.objects
+  for delete using (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text);
+
+-- ============ SERVICES DE RÉPARATION (catalogue configurable par l'admin) ============
+create table if not exists repair_services (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  duration text not null default '',
+  price_label text not null default '',
+  description text,
+  image_url text,
+  created_at timestamptz not null default now()
+);
+alter table repair_services enable row level security;
+
+drop policy if exists "repair_services_select_all" on repair_services;
+create policy "repair_services_select_all" on repair_services for select using (true);
+
+drop policy if exists "repair_services_admin_insert" on repair_services;
+create policy "repair_services_admin_insert" on repair_services for insert with check (is_admin());
+
+drop policy if exists "repair_services_admin_update" on repair_services;
+create policy "repair_services_admin_update" on repair_services for update using (is_admin());
+
+drop policy if exists "repair_services_admin_delete" on repair_services;
+create policy "repair_services_admin_delete" on repair_services for delete using (is_admin());
+
+insert into repair_services (name, duration, price_label)
+select * from (values
+  ('Changement de pneu', '45 min', 'à partir de 35 €'),
+  ('Réglage des freins', '30 min', '25 €'),
+  ('Révision complète', '1h00', '75 €'),
+  ('Diagnostic électrique', '1h00', '45 €'),
+  ('Réparation batterie', '1h30', 'à partir de 90 €'),
+  ('Personnalisation', '', 'Sur devis')
+) as v(name, duration, price_label)
+where not exists (select 1 from repair_services);
+
+insert into storage.buckets (id, name, public)
+select 'service-images', 'service-images', true
+where not exists (select 1 from storage.buckets where id = 'service-images');
+
+drop policy if exists "service images public read" on storage.objects;
+create policy "service images public read" on storage.objects
+  for select using (bucket_id = 'service-images');
+
+drop policy if exists "service images admin write" on storage.objects;
+create policy "service images admin write" on storage.objects
+  for insert with check (bucket_id = 'service-images' and is_admin());
+
+drop policy if exists "service images admin update" on storage.objects;
+create policy "service images admin update" on storage.objects
+  for update using (bucket_id = 'service-images' and is_admin());
+
+drop policy if exists "service images admin delete" on storage.objects;
+create policy "service images admin delete" on storage.objects
+  for delete using (bucket_id = 'service-images' and is_admin());
+
+-- ============ OBJECTIFS FIDÉLITÉ (badges à réclamer, une fois chacun) ============
+create table if not exists loyalty_goal_claims (
+  id uuid primary key default gen_random_uuid(),
+  client_id uuid not null references auth.users(id) on delete cascade,
+  goal_id text not null,
+  points int not null,
+  claimed_at timestamptz not null default now(),
+  unique (client_id, goal_id)
+);
+alter table loyalty_goal_claims enable row level security;
+
+drop policy if exists "loyalty_goal_claims_select_own" on loyalty_goal_claims;
+create policy "loyalty_goal_claims_select_own" on loyalty_goal_claims
+  for select using (client_id = auth.uid() or is_admin());
+
+-- Le crédit de points ne passe que par cette fonction (jamais d'insert direct côté client),
+-- pour garantir qu'un objectif ne peut être réclamé qu'une seule fois par utilisateur.
+create or replace function claim_loyalty_goal(p_goal_id text, p_points int)
+returns boolean
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  already_claimed boolean;
+begin
+  select exists(
+    select 1 from loyalty_goal_claims where client_id = auth.uid() and goal_id = p_goal_id
+  ) into already_claimed;
+
+  if already_claimed then
+    return false;
+  end if;
+
+  insert into loyalty_goal_claims (client_id, goal_id, points) values (auth.uid(), p_goal_id, p_points);
+  update profiles set loyalty_points = loyalty_points + p_points where id = auth.uid();
+  return true;
+end;
+$$;
+
+grant execute on function claim_loyalty_goal(text, int) to authenticated;

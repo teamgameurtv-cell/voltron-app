@@ -10,6 +10,7 @@ import '../../providers/repairs_provider.dart';
 import '../../providers/rewards_provider.dart';
 import '../../providers/subscription_provider.dart';
 import '../../theme/voltron_theme.dart';
+import '../../widgets/client_avatar.dart';
 import '../../widgets/quick_access_button.dart';
 
 class AccueilScreen extends ConsumerWidget {
@@ -31,7 +32,7 @@ class AccueilScreen extends ConsumerWidget {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
           children: [
-            _buildHeader(context, unreadCount),
+            _buildHeader(context, unreadCount, profile.name, profile.avatarUrl),
             const SizedBox(height: 20),
             _buildLoyaltyCard(context, rewards, profile.loyaltyPoints),
             if (activePlan != null) ...[
@@ -79,19 +80,22 @@ class AccueilScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildHeader(BuildContext context, int unreadCount) {
+  Widget _buildHeader(BuildContext context, int unreadCount, String clientName, String? avatarUrl) {
+    final firstName = clientName.trim().isEmpty ? null : clientName.trim().split(' ').first;
     return Row(
       children: [
+        Image.asset('assets/images/voltron_logo.png', width: 36),
+        const SizedBox(width: 10),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: const [
+            children: [
               Text(
-                'Salut Maxime !',
-                style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
+                firstName != null ? 'Salut $firstName !' : 'Salut !',
+                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
               ),
-              SizedBox(height: 2),
-              Text(
+              const SizedBox(height: 2),
+              const Text(
                 'Prêt à rouler ?',
                 style: TextStyle(color: VoltronColors.greyText, fontSize: 13),
               ),
@@ -121,11 +125,7 @@ class AccueilScreen extends ConsumerWidget {
         ),
         GestureDetector(
           onTap: () => context.push('/account'),
-          child: const CircleAvatar(
-            radius: 20,
-            backgroundColor: VoltronColors.cardBlack,
-            child: Icon(Icons.person, color: VoltronColors.greyText),
-          ),
+          child: ClientAvatar(avatarUrl: avatarUrl, radius: 20),
         ),
       ],
     );

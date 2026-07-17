@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../providers/cart_provider.dart';
 import '../../providers/catalog_provider.dart';
 import '../../theme/voltron_theme.dart';
+import '../../widgets/product_visual.dart';
 
 class ProductDetailScreen extends ConsumerStatefulWidget {
   final String productId;
@@ -76,7 +77,7 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                         ],
                       ),
                     ),
-                    child: Icon(product.icon, size: 140, color: VoltronColors.electricYellow),
+                    child: ProductVisual(product: product, size: 200, iconSize: 140),
                   ),
                   const SizedBox(height: 20),
                   Text(
@@ -92,6 +93,16 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                       color: VoltronColors.electricYellow,
                     ),
                   ),
+                  if ((product.description ?? '').isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    const Text('Description',
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 8),
+                    Text(
+                      product.description!,
+                      style: const TextStyle(fontSize: 13, color: Colors.white70, height: 1.4),
+                    ),
+                  ],
                   if ((specsAsync.valueOrNull ?? []).isNotEmpty) ...[
                     const SizedBox(height: 16),
                     ...(specsAsync.valueOrNull ?? []).map(

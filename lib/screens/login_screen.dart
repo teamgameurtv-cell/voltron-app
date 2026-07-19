@@ -24,10 +24,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     super.dispose();
   }
 
-  Future<void> _signIn() async {
+  Future<void> _signIn({String redirect = '/home'}) async {
     if (_emailController.text.trim().isEmpty || _passwordController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Renseigne ton e-mail et ton mot de passe')),
+        SnackBar(
+          content: Text(redirect == '/admin'
+              ? 'Connecte-toi avec ton compte administrateur (e-mail + mot de passe) pour accéder au panel'
+              : 'Renseigne ton e-mail et ton mot de passe'),
+        ),
       );
       return;
     }
@@ -41,7 +45,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     if (error != null) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error)));
     } else {
-      context.go('/home');
+      context.go(redirect);
     }
   }
 
@@ -181,7 +185,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               const SizedBox(height: 12),
               Center(
                 child: TextButton(
-                  onPressed: () => context.go('/admin'),
+                  onPressed: _isLoading ? null : () => _signIn(redirect: '/admin'),
                   child: const Text(
                     'Accès administrateur',
                     style: TextStyle(color: VoltronColors.greyText, fontSize: 12),

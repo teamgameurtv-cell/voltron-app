@@ -6,6 +6,8 @@ import '../../models/reward.dart';
 import '../../providers/subscription_provider.dart';
 import '../../theme/voltron_theme.dart';
 
+const _plusPlanId = 'plus';
+
 class VoltronCareScreen extends ConsumerWidget {
   const VoltronCareScreen({super.key});
 
@@ -57,6 +59,14 @@ class VoltronCareScreen extends ConsumerWidget {
                   ],
                 ),
               ),
+              if (activePlan.id == _plusPlanId) ...[
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  onPressed: () => context.push('/support'),
+                  icon: const Icon(Icons.support_agent_rounded, size: 18),
+                  label: const Text('Contacter notre équipe (prioritaire)'),
+                ),
+              ],
               const SizedBox(height: 20),
             ],
             const Text(

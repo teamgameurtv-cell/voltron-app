@@ -26,6 +26,14 @@ class RewardsNotifier extends StateNotifier<List<Reward>> {
     await _client.from('rewards').delete().eq('id', id);
   }
 
+  /// Débite les points et enregistre l'échange côté serveur (vérifie le solde).
+  /// Lève une [PostgrestException] si le solde est insuffisant.
+  Future<RewardRedemption> redeem(String rewardId) async {
+    final rows = await _client.rpc('redeem_reward', params: {'p_reward_id': rewardId});
+    final row = (rows as List).first as Map<String, dynamic>;
+    return RewardRedemption.fromMap(row);
+  }
+
   @override
   void dispose() {
     _sub?.cancel();

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../models/repair.dart';
 import '../../providers/repairs_provider.dart';
 import '../../theme/voltron_theme.dart';
@@ -85,6 +86,14 @@ class QuoteScreen extends ConsumerWidget {
               const SizedBox(height: 16),
               Text('Délai estimé : ${quote.estimatedDelay}',
                   style: const TextStyle(color: VoltronColors.greyText, fontSize: 12)),
+              if ((quote.fileUrl ?? '').isNotEmpty) ...[
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  onPressed: () => launchUrl(Uri.parse(quote.fileUrl!), mode: LaunchMode.externalApplication),
+                  icon: const Icon(Icons.attach_file, size: 16),
+                  label: const Text('Voir le fichier joint'),
+                ),
+              ],
               if (quote.status != QuoteStatus.pendingApproval) ...[
                 const SizedBox(height: 16),
                 Container(

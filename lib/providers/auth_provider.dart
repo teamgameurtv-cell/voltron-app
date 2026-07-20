@@ -28,12 +28,17 @@ class AuthNotifier {
     }
   }
 
-  Future<String?> signUp({required String email, required String password, required String name}) async {
+  Future<String?> signUp({
+    required String email,
+    required String password,
+    required String name,
+    required String firstName,
+  }) async {
     try {
       await _client.auth.signUp(
         email: email,
         password: password,
-        data: {'name': name},
+        data: {'name': name, 'first_name': firstName},
       );
       return null;
     } on AuthException catch (e) {

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/app_notification.dart';
@@ -54,6 +55,20 @@ class GarageNotifier extends StateNotifier<List<OwnedScooter>> {
 
   Future<void> removeScooter(String id) async {
     await _client.from('scooters').delete().eq('id', id);
+  }
+
+  /// Envoie la photo choisie dans le stockage Supabase et l'associe au véhicule.
+  Future<void> updateScooterImage(String scooterId, Uint8List bytes, String fileExtension) async {
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) return;
+    final path = '$userId/${scooterId}_${DateTime.now().millisecondsSinceEpoch}.$fileExtension';
+    await _client.storage.from('scooter-images').uploadBinary(
+          path,
+          bytes,
+          fileOptions: const FileOptions(upsert: true),
+        );
+    final url = _client.storage.from('scooter-images').getPublicUrl(path);
+    await _client.from('scooters').update({'image_url': url}).eq('id', scooterId);
   }
 
   @override

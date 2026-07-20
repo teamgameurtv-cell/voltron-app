@@ -13,6 +13,7 @@ enum AdminSection {
   repairsBoard,
   services,
   announcements,
+  support,
 }
 
 class _NavItem {
@@ -35,6 +36,7 @@ const List<_NavItem> _navItems = [
   _NavItem(AdminSection.stock, 'Stock', Icons.inventory_2_rounded, '/admin/stock'),
   _NavItem(AdminSection.rewards, 'Fidélité', Icons.star_rounded, '/admin/rewards'),
   _NavItem(AdminSection.announcements, 'Annonces', Icons.campaign_rounded, '/admin/announcements'),
+  _NavItem(AdminSection.support, 'Support client', Icons.support_agent_rounded, '/admin/support'),
 ];
 
 class AdminShell extends StatelessWidget {

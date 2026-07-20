@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/app_notification.dart';
 import '../../providers/notifications_provider.dart';
+import '../../providers/promo_banner_provider.dart';
 import '../../theme/voltron_theme.dart';
 import 'admin_shell.dart';
 
@@ -12,21 +13,48 @@ class AdminAnnouncementsScreen extends ConsumerStatefulWidget {
   ConsumerState<AdminAnnouncementsScreen> createState() => _AdminAnnouncementsScreenState();
 }
 
+const List<(String, String)> _bannerRouteOptions = [
+  ('/shop', 'Boutique'),
+  ('/repairs/book', 'Réservation'),
+  ('/loyalty', 'Fidélité'),
+  ('/loyalty/care', 'Voltron Care'),
+];
+
 class _AdminAnnouncementsScreenState extends ConsumerState<AdminAnnouncementsScreen> {
   final _titleController = TextEditingController();
   final _bodyController = TextEditingController();
   NotificationType _type = NotificationType.promo;
 
+  final _bannerTitleController = TextEditingController();
+  final _bannerSubtitleController = TextEditingController();
+  final _bannerCtaLabelController = TextEditingController();
+  String _bannerCtaRoute = '/shop';
+  bool _bannerActive = false;
+  bool _bannerHydrated = false;
+
   @override
   void dispose() {
     _titleController.dispose();
     _bodyController.dispose();
+    _bannerTitleController.dispose();
+    _bannerSubtitleController.dispose();
+    _bannerCtaLabelController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final sent = ref.watch(notificationsProvider).where((n) => n.type == NotificationType.promo).toList();
+    ref.watch(promoBannerProvider).whenData((banner) {
+      if (!_bannerHydrated && banner != null) {
+        _bannerTitleController.text = banner.title;
+        _bannerSubtitleController.text = banner.subtitle;
+        _bannerCtaLabelController.text = banner.ctaLabel;
+        _bannerCtaRoute = banner.ctaRoute;
+        _bannerActive = banner.active;
+        _bannerHydrated = true;
+      }
+    });
 
     return AdminShell(
       selected: AdminSection.announcements,
@@ -83,6 +111,71 @@ class _AdminAnnouncementsScreenState extends ConsumerState<AdminAnnouncementsScr
                   },
                   icon: const Icon(Icons.send_rounded, size: 16),
                   label: const Text('ENVOYER'),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: VoltronColors.cardBlack,
+              borderRadius: BorderRadius.circular(VoltronRadii.md),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Bannière promo (page d\'accueil)',
+                        style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                    Switch(
+                      value: _bannerActive,
+                      activeColor: VoltronColors.electricYellow,
+                      onChanged: (v) => setState(() => _bannerActive = v),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: _bannerTitleController,
+                  decoration: const InputDecoration(hintText: 'Titre (ex : -15% sur les pneus)'),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _bannerSubtitleController,
+                  decoration: const InputDecoration(hintText: 'Sous-titre (ex : Jusqu\'au 30 juin)'),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _bannerCtaLabelController,
+                  decoration: const InputDecoration(hintText: 'Texte du bouton (ex : J\'en profite)'),
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  value: _bannerCtaRoute,
+                  dropdownColor: VoltronColors.cardBlack,
+                  items: _bannerRouteOptions
+                      .map((o) => DropdownMenuItem(value: o.$1, child: Text('Le bouton mène à : ${o.$2}')))
+                      .toList(),
+                  onChanged: (v) => setState(() => _bannerCtaRoute = v ?? '/shop'),
+                ),
+                const SizedBox(height: 14),
+                ElevatedButton(
+                  onPressed: () {
+                    ref.read(promoBannerActionsProvider).update(
+                          title: _bannerTitleController.text.trim(),
+                          subtitle: _bannerSubtitleController.text.trim(),
+                          ctaLabel: _bannerCtaLabelController.text.trim(),
+                          ctaRoute: _bannerCtaRoute,
+                          active: _bannerActive,
+                        );
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Bannière mise à jour')),
+                    );
+                  },
+                  child: const Text('ENREGISTRER LA BANNIÈRE'),
                 ),
               ],
             ),

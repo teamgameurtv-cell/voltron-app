@@ -20,9 +20,7 @@ class AboutScreen extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.electric_scooter_rounded, color: VoltronColors.electricYellow, size: 56),
-                const SizedBox(height: 16),
-                const Text('VOLTRON', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, letterSpacing: 2)),
+                Image.asset('assets/images/voltron_logo.png', width: 220),
                 const SizedBox(height: 4),
                 const Text('Plus qu\'une trott, un mode de vie',
                     style: TextStyle(color: VoltronColors.greyText, fontSize: 12)),

@@ -4,6 +4,7 @@ class OwnedScooter {
   final String model;
   final String serialNumber;
   final DateTime purchaseDate;
+  final String? imageUrl;
 
   const OwnedScooter({
     required this.id,
@@ -11,6 +12,7 @@ class OwnedScooter {
     required this.model,
     required this.serialNumber,
     required this.purchaseDate,
+    this.imageUrl,
   });
 
   String get formattedPurchaseDate =>
@@ -36,6 +38,7 @@ class OwnedScooter {
       model: map['model'] as String,
       serialNumber: map['serial_number'] as String? ?? '',
       purchaseDate: DateTime.parse(map['purchase_date'] as String),
+      imageUrl: map['image_url'] as String?,
     );
   }
 }

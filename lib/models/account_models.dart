@@ -1,35 +1,51 @@
 class UserProfile {
   final String name;
+  final String firstName;
   final String email;
   final String phone;
   final int loyaltyPoints;
   final String? avatarUrl;
+  final List<String> quickShortcuts;
 
   const UserProfile({
     required this.name,
+    this.firstName = '',
     required this.email,
     required this.phone,
     this.loyaltyPoints = 0,
     this.avatarUrl,
+    this.quickShortcuts = const ['book', 'shop', 'garage', 'care'],
   });
 
-  UserProfile copyWith({String? name, String? email, String? phone, String? avatarUrl}) {
+  UserProfile copyWith({
+    String? name,
+    String? firstName,
+    String? email,
+    String? phone,
+    String? avatarUrl,
+    List<String>? quickShortcuts,
+  }) {
     return UserProfile(
       name: name ?? this.name,
+      firstName: firstName ?? this.firstName,
       email: email ?? this.email,
       phone: phone ?? this.phone,
       loyaltyPoints: loyaltyPoints,
       avatarUrl: avatarUrl ?? this.avatarUrl,
+      quickShortcuts: quickShortcuts ?? this.quickShortcuts,
     );
   }
 
   factory UserProfile.fromMap(Map<String, dynamic> map) {
     return UserProfile(
       name: map['name'] as String? ?? '',
+      firstName: map['first_name'] as String? ?? '',
       email: map['email'] as String? ?? '',
       phone: map['phone'] as String? ?? '',
       loyaltyPoints: map['loyalty_points'] as int? ?? 0,
       avatarUrl: map['avatar_url'] as String?,
+      quickShortcuts: (map['quick_shortcuts'] as List?)?.map((e) => e as String).toList() ??
+          const ['book', 'shop', 'garage', 'care'],
     );
   }
 }

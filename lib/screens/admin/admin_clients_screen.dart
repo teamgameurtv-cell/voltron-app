@@ -81,7 +81,7 @@ class _AdminClientsScreenState extends ConsumerState<AdminClientsScreen> {
                                     child: Column(
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
-                                        Text(client.name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                                        Text(client.fullName, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
                                         Text(client.email, style: const TextStyle(color: VoltronColors.greyText, fontSize: 11)),
                                       ],
                                     ),
@@ -122,16 +122,18 @@ class _ClientDetail extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final clientsAsync = ref.watch(clientSearchProvider(''));
+    final clientAsync = ref.watch(clientByIdProvider(clientId));
     final scootersAsync = ref.watch(clientScootersProvider(clientId));
     final invoicesAsync = ref.watch(clientInvoicesProvider(clientId));
     final services = ref.watch(repairServicesProvider);
 
-    return clientsAsync.when(
+    return clientAsync.when(
       loading: () => const Center(child: CircularProgressIndicator(color: VoltronColors.electricYellow)),
       error: (err, _) => Text('Erreur : $err', style: const TextStyle(color: VoltronColors.greyText)),
-      data: (clients) {
-        final client = clients.firstWhere((c) => c.id == clientId, orElse: () => clients.first);
+      data: (client) {
+        if (client == null) {
+          return const Center(child: Text('Client introuvable.', style: TextStyle(color: VoltronColors.greyText)));
+        }
         final scooters = scootersAsync.valueOrNull ?? [];
         final invoices = invoicesAsync.valueOrNull ?? [];
 
@@ -145,11 +147,15 @@ class _ClientDetail extends ConsumerWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(client.name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+                      Text(client.fullName, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
                       Text(client.email, style: const TextStyle(color: VoltronColors.greyText, fontSize: 12)),
                       Text(client.phone, style: const TextStyle(color: VoltronColors.greyText, fontSize: 12)),
                     ],
                   ),
+                ),
+                IconButton(
+                  onPressed: () => _showEditClientDialog(context, ref, client),
+                  icon: const Icon(Icons.edit_outlined, size: 18),
                 ),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -171,9 +177,19 @@ class _ClientDetail extends ConsumerWidget {
               ],
             ),
             const SizedBox(height: 24),
-            const Text('VÉHICULES',
-                style: TextStyle(fontSize: 12, letterSpacing: 1, fontWeight: FontWeight.w700, color: VoltronColors.greyText)),
-            const SizedBox(height: 10),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('VÉHICULES',
+                    style: TextStyle(fontSize: 12, letterSpacing: 1, fontWeight: FontWeight.w700, color: VoltronColors.greyText)),
+                TextButton.icon(
+                  onPressed: () => _showScooterDialog(context, ref, clientId),
+                  icon: const Icon(Icons.add, size: 16),
+                  label: const Text('AJOUTER'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
             if (scooters.isEmpty)
               const Text('Aucun véhicule enregistré.', style: TextStyle(color: VoltronColors.greyText, fontSize: 12)),
             ...scooters.map((v) => Container(
@@ -182,11 +198,39 @@ class _ClientDetail extends ConsumerWidget {
                   decoration: BoxDecoration(color: VoltronColors.cardBlack, borderRadius: BorderRadius.circular(VoltronRadii.md)),
                   child: Row(
                     children: [
-                      const Icon(Icons.electric_scooter_rounded, color: VoltronColors.electricYellow, size: 18),
+                      Container(
+                        width: 44,
+                        height: 44,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: VoltronColors.deepBlack,
+                          borderRadius: BorderRadius.circular(VoltronRadii.sm),
+                        ),
+                        child: (v.imageUrl != null && v.imageUrl!.isNotEmpty)
+                            ? ClipRRect(
+                                borderRadius: BorderRadius.circular(VoltronRadii.sm),
+                                child: Image.network(v.imageUrl!, width: 44, height: 44, fit: BoxFit.cover),
+                              )
+                            : const Icon(Icons.electric_scooter_rounded, color: VoltronColors.electricYellow, size: 18),
+                      ),
                       const SizedBox(width: 10),
-                      Text('${v.brand} ${v.model}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                      const SizedBox(width: 10),
-                      Text('N° ${v.serialNumber}', style: const TextStyle(color: VoltronColors.greyText, fontSize: 11)),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('${v.brand} ${v.model}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                            Text('N° ${v.serialNumber}', style: const TextStyle(color: VoltronColors.greyText, fontSize: 11)),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () => _showScooterDialog(context, ref, clientId, existing: v),
+                        icon: const Icon(Icons.edit_outlined, size: 16),
+                      ),
+                      IconButton(
+                        onPressed: () => ref.read(adminCrmActionsProvider).removeScooter(v.id),
+                        icon: const Icon(Icons.delete_outline, size: 16, color: Color(0xFFFF5C5C)),
+                      ),
                     ],
                   ),
                 )),
@@ -231,7 +275,7 @@ class _ClientDetail extends ConsumerWidget {
       builder: (dialogContext) => StatefulBuilder(
         builder: (dialogContext, setDialogState) => AlertDialog(
           backgroundColor: VoltronColors.cardBlack,
-          title: Text('Nouveau dossier — ${client.name}'),
+          title: Text('Nouveau dossier — ${client.fullName}'),
           content: SizedBox(
             width: 380,
             child: Column(
@@ -270,13 +314,110 @@ class _ClientDetail extends ConsumerWidget {
                 if (!dialogContext.mounted) return;
                 Navigator.of(dialogContext).pop();
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Dossier #$id ouvert pour ${client.name} (${selectedService.name})')),
+                  SnackBar(content: Text('Dossier #$id ouvert pour ${client.fullName} (${selectedService.name})')),
                 );
               },
               child: const Text('OUVRIR'),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  void _showEditClientDialog(BuildContext context, WidgetRef ref, Client client) {
+    final firstNameController = TextEditingController(text: client.firstName);
+    final nameController = TextEditingController(text: client.name);
+    final emailController = TextEditingController(text: client.email);
+    final phoneController = TextEditingController(text: client.phone);
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: VoltronColors.cardBlack,
+        title: const Text('Modifier le client'),
+        content: SizedBox(
+          width: 360,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(controller: firstNameController, decoration: const InputDecoration(hintText: 'Prénom')),
+              const SizedBox(height: 12),
+              TextField(controller: nameController, decoration: const InputDecoration(hintText: 'Nom')),
+              const SizedBox(height: 12),
+              TextField(controller: emailController, decoration: const InputDecoration(hintText: 'E-mail')),
+              const SizedBox(height: 12),
+              TextField(controller: phoneController, decoration: const InputDecoration(hintText: 'Téléphone')),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(dialogContext).pop(), child: const Text('Annuler')),
+          ElevatedButton(
+            onPressed: () {
+              ref.read(adminCrmActionsProvider).updateClientProfile(
+                    client.id,
+                    name: nameController.text.trim(),
+                    firstName: firstNameController.text.trim(),
+                    email: emailController.text.trim(),
+                    phone: phoneController.text.trim(),
+                  );
+              Navigator.of(dialogContext).pop();
+            },
+            child: const Text('ENREGISTRER'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showScooterDialog(BuildContext context, WidgetRef ref, String clientId, {OwnedScooter? existing}) {
+    final brandController = TextEditingController(text: existing?.brand ?? '');
+    final modelController = TextEditingController(text: existing?.model ?? '');
+    final serialController = TextEditingController(text: existing?.serialNumber ?? '');
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: VoltronColors.cardBlack,
+        title: Text(existing == null ? 'Nouveau véhicule' : 'Modifier le véhicule'),
+        content: SizedBox(
+          width: 360,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(controller: brandController, decoration: const InputDecoration(hintText: 'Marque')),
+              const SizedBox(height: 12),
+              TextField(controller: modelController, decoration: const InputDecoration(hintText: 'Modèle')),
+              const SizedBox(height: 12),
+              TextField(controller: serialController, decoration: const InputDecoration(hintText: 'Numéro de série')),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(dialogContext).pop(), child: const Text('Annuler')),
+          ElevatedButton(
+            onPressed: () {
+              if (existing == null) {
+                ref.read(adminCrmActionsProvider).addScooter(
+                      clientId,
+                      brand: brandController.text.trim(),
+                      model: modelController.text.trim(),
+                      serialNumber: serialController.text.trim(),
+                    );
+              } else {
+                ref.read(adminCrmActionsProvider).updateScooter(
+                      existing.id,
+                      brand: brandController.text.trim(),
+                      model: modelController.text.trim(),
+                      serialNumber: serialController.text.trim(),
+                    );
+              }
+              Navigator.of(dialogContext).pop();
+            },
+            child: const Text('ENREGISTRER'),
+          ),
+        ],
       ),
     );
   }

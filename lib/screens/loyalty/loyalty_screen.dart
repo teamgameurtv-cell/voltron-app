@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../models/reward.dart';
 import '../../providers/account_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/garage_provider.dart';
@@ -147,7 +148,7 @@ class LoyaltyScreen extends ConsumerWidget {
                   ),
                   const SizedBox(height: 12),
                   OutlinedButton(
-                    onPressed: () {},
+                    onPressed: () => _showHistoryDialog(context),
                     style: OutlinedButton.styleFrom(
                       side: const BorderSide(color: Colors.white54),
                       padding: const EdgeInsets.symmetric(vertical: 10),
@@ -156,6 +157,12 @@ class LoyaltyScreen extends ConsumerWidget {
                   ),
                 ],
               ),
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: () => context.push('/loyalty/qr'),
+              icon: const Icon(Icons.qr_code_2_rounded),
+              label: const Text('MON QR CODE FIDÉLITÉ'),
             ),
             const SizedBox(height: 24),
             Row(
@@ -251,7 +258,9 @@ class LoyaltyScreen extends ConsumerWidget {
             const Text('RÉCOMPENSES DISPONIBLES',
                 style: TextStyle(fontSize: 12, letterSpacing: 1, fontWeight: FontWeight.w700, color: VoltronColors.greyText)),
             const SizedBox(height: 12),
-            ...rewards.map((reward) => Container(
+            ...rewards.map((reward) {
+              final canAfford = loyaltyPoints >= reward.points;
+              return Container(
                   margin: const EdgeInsets.only(bottom: 10),
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
@@ -284,27 +293,34 @@ class LoyaltyScreen extends ConsumerWidget {
                       ),
                       TextButton(
                         style: TextButton.styleFrom(
-                          backgroundColor: VoltronColors.electricYellow,
-                          foregroundColor: VoltronColors.deepBlack,
+                          backgroundColor: canAfford ? VoltronColors.electricYellow : VoltronColors.deepBlack,
+                          foregroundColor: canAfford ? VoltronColors.deepBlack : VoltronColors.greyText,
                           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(VoltronRadii.pill),
                           ),
                         ),
-                        onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('${reward.label} échangé')),
-                        ),
-                        child: const Text('Échanger', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
+                        onPressed: !canAfford
+                            ? null
+                            : () async {
+                                try {
+                                  final redemption = await ref.read(rewardsProvider.notifier).redeem(reward.id);
+                                  if (!context.mounted) return;
+                                  _showRedemptionDialog(context, redemption);
+                                } catch (e) {
+                                  if (!context.mounted) return;
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('Pas assez de points pour cette récompense')),
+                                  );
+                                }
+                              },
+                        child: Text(canAfford ? 'Échanger' : 'Pas assez de points',
+                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
                       ),
                     ],
                   ),
-                )),
-            const SizedBox(height: 8),
-            OutlinedButton.icon(
-              onPressed: () => context.push('/loyalty/qr'),
-              icon: const Icon(Icons.qr_code_2_rounded),
-              label: const Text('MON QR CODE FIDÉLITÉ'),
-            ),
+                );
+            }),
             const SizedBox(height: 20),
             Container(
               padding: const EdgeInsets.all(16),
@@ -335,6 +351,127 @@ class LoyaltyScreen extends ConsumerWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  void _showHistoryDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: VoltronColors.cardBlack,
+        title: const Text('Historique des points'),
+        content: SizedBox(
+          width: 360,
+          child: Consumer(
+            builder: (context, ref, _) {
+              final historyAsync = ref.watch(loyaltyHistoryProvider);
+              return historyAsync.when(
+                loading: () => const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 20),
+                  child: Center(child: CircularProgressIndicator(color: VoltronColors.electricYellow)),
+                ),
+                error: (err, _) => Text('Erreur : $err', style: const TextStyle(color: VoltronColors.greyText)),
+                data: (rows) {
+                  if (rows.isEmpty) {
+                    return const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 20),
+                      child: Text(
+                        'Aucun historique pour l\'instant. Complète des objectifs fidélité pour gagner tes premiers points !',
+                        style: TextStyle(color: VoltronColors.greyText, fontSize: 13),
+                      ),
+                    );
+                  }
+                  return SizedBox(
+                    height: 320,
+                    child: ListView.separated(
+                      itemCount: rows.length,
+                      separatorBuilder: (_, __) => const Divider(color: Colors.white24, height: 1),
+                      itemBuilder: (context, index) {
+                        final row = rows[index];
+                        final goalId = row['goal_id'] as String;
+                        final title = _loyaltyGoals.firstWhere(
+                          (g) => g.id == goalId,
+                          orElse: () => _LoyaltyGoal(id: goalId, title: goalId, subtitle: '', points: 0, icon: Icons.star),
+                        ).title;
+                        final date = DateTime.tryParse(row['claimed_at'] as String)?.toLocal();
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                                    if (date != null)
+                                      Text(
+                                        '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}',
+                                        style: const TextStyle(color: VoltronColors.greyText, fontSize: 11),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                              Text('+${row['points']} pts',
+                                  style: const TextStyle(color: VoltronColors.electricYellow, fontWeight: FontWeight.w700)),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  );
+                },
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(dialogContext).pop(), child: const Text('Fermer')),
+        ],
+      ),
+    );
+  }
+
+  void _showRedemptionDialog(BuildContext context, RewardRedemption redemption) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: VoltronColors.cardBlack,
+        title: const Text('Récompense échangée !'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(redemption.rewardLabel, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 4),
+            Text('${redemption.pointsSpent} points dépensés',
+                style: const TextStyle(color: VoltronColors.greyText, fontSize: 12)),
+            const SizedBox(height: 20),
+            const Text('Présente ce code en boutique pour en profiter :',
+                style: TextStyle(color: VoltronColors.greyText, fontSize: 12)),
+            const SizedBox(height: 8),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: VoltronColors.deepBlack,
+                borderRadius: BorderRadius.circular(VoltronRadii.md),
+                border: Border.all(color: VoltronColors.electricYellow),
+              ),
+              child: Text(redemption.code,
+                  style: const TextStyle(
+                    color: VoltronColors.electricYellow,
+                    fontSize: 24,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 4,
+                  )),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(dialogContext).pop(), child: const Text('Fermer')),
+        ],
       ),
     );
   }

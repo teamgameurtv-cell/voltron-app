@@ -33,6 +33,32 @@ class Reward {
   }
 }
 
+class RewardRedemption {
+  final String id;
+  final String code;
+  final String rewardLabel;
+  final int pointsSpent;
+  final DateTime redeemedAt;
+
+  const RewardRedemption({
+    required this.id,
+    required this.code,
+    required this.rewardLabel,
+    required this.pointsSpent,
+    required this.redeemedAt,
+  });
+
+  factory RewardRedemption.fromMap(Map<String, dynamic> map) {
+    return RewardRedemption(
+      id: map['id'] as String,
+      code: map['code'] as String,
+      rewardLabel: map['reward_label'] as String,
+      pointsSpent: map['points_spent'] as int,
+      redeemedAt: DateTime.parse(map['redeemed_at'] as String),
+    );
+  }
+}
+
 class CarePlan {
   final String id;
   final String name;

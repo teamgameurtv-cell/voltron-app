@@ -15,6 +15,18 @@ final claimedLoyaltyGoalsProvider = StreamProvider<Set<String>>((ref) {
       .map((rows) => rows.map((r) => r['goal_id'] as String).toSet());
 });
 
+/// Historique complet des points gagnés (un objectif réclamé = une ligne).
+final loyaltyHistoryProvider = StreamProvider<List<Map<String, dynamic>>>((ref) {
+  final userId = ref.watch(currentUserProvider)?.id;
+  if (userId == null) return Stream.value(const <Map<String, dynamic>>[]);
+  return ref
+      .watch(supabaseProvider)
+      .from('loyalty_goal_claims')
+      .stream(primaryKey: ['id'])
+      .eq('client_id', userId)
+      .order('claimed_at', ascending: false);
+});
+
 class LoyaltyGoalsNotifier {
   final SupabaseClient _client;
 

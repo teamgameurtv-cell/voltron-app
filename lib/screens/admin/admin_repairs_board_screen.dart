@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../models/repair.dart';
 import '../../providers/repairs_provider.dart';
 import '../../theme/voltron_theme.dart';
+import '../../widgets/repair_order_card.dart';
 import 'admin_shell.dart';
 
 const List<String> _columns = [
@@ -61,27 +63,30 @@ class AdminRepairsBoardScreen extends ConsumerWidget {
                     ],
                   ),
                   const SizedBox(height: 10),
-                  ...columnOrders.map((order) => Container(
-                        margin: const EdgeInsets.only(bottom: 8),
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: VoltronColors.deepBlack,
-                          borderRadius: BorderRadius.circular(VoltronRadii.sm),
-                          border: order.isBlockedOnQuote
-                              ? Border.all(color: VoltronColors.warning.withValues(alpha: 0.6))
-                              : null,
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('#${order.id}', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
-                            Text(order.scooterName, style: const TextStyle(color: VoltronColors.greyText, fontSize: 11)),
-                            if (order.isBlockedOnQuote)
-                              const Padding(
-                                padding: EdgeInsets.only(top: 4),
-                                child: Text('En attente devis', style: TextStyle(color: VoltronColors.warning, fontSize: 10)),
-                              ),
-                          ],
+                  ...columnOrders.map((order) => GestureDetector(
+                        onTap: () => _showOrderDialog(context, order),
+                        child: Container(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: VoltronColors.deepBlack,
+                            borderRadius: BorderRadius.circular(VoltronRadii.sm),
+                            border: order.isBlockedOnQuote
+                                ? Border.all(color: VoltronColors.warning.withValues(alpha: 0.6))
+                                : null,
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('#${order.id}', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
+                              Text(order.scooterName, style: const TextStyle(color: VoltronColors.greyText, fontSize: 11)),
+                              if (order.isBlockedOnQuote)
+                                const Padding(
+                                  padding: EdgeInsets.only(top: 4),
+                                  child: Text('En attente devis', style: TextStyle(color: VoltronColors.warning, fontSize: 10)),
+                                ),
+                            ],
+                          ),
                         ),
                       )),
                   if (columnOrders.isEmpty)
@@ -90,6 +95,19 @@ class AdminRepairsBoardScreen extends ConsumerWidget {
               ),
             );
           }).toList(),
+        ),
+      ),
+    );
+  }
+
+  void _showOrderDialog(BuildContext context, RepairOrder order) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 480),
+          child: SingleChildScrollView(child: RepairOrderCard(order: order)),
         ),
       ),
     );

@@ -1,3 +1,4 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -53,38 +54,57 @@ class GarageScreen extends ConsumerWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          children: [
-                            Container(
-                              width: 52,
-                              height: 52,
-                              decoration: BoxDecoration(
-                                color: VoltronColors.deepBlack,
-                                borderRadius: BorderRadius.circular(VoltronRadii.sm),
-                              ),
-                              child: const Icon(Icons.electric_scooter_rounded, color: VoltronColors.electricYellow),
+                        GestureDetector(
+                          onTap: () => _pickAndUploadImage(context, ref, scooter.id),
+                          child: AspectRatio(
+                            aspectRatio: 1.8,
+                            child: Stack(
+                              children: [
+                                Positioned.fill(
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      color: VoltronColors.deepBlack,
+                                      borderRadius: BorderRadius.circular(VoltronRadii.md),
+                                    ),
+                                    child: (scooter.imageUrl != null && scooter.imageUrl!.isNotEmpty)
+                                        ? ClipRRect(
+                                            borderRadius: BorderRadius.circular(VoltronRadii.md),
+                                            child: Image.network(scooter.imageUrl!, fit: BoxFit.cover, width: double.infinity, height: double.infinity),
+                                          )
+                                        : const Center(
+                                            child: Column(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(Icons.add_a_photo_outlined, color: VoltronColors.greyText, size: 28),
+                                                SizedBox(height: 6),
+                                                Text('Ajouter une photo',
+                                                    style: TextStyle(color: VoltronColors.greyText, fontSize: 11)),
+                                              ],
+                                            ),
+                                          ),
+                                  ),
+                                ),
+                                Positioned(
+                                  right: 8,
+                                  top: 8,
+                                  child: IconButton(
+                                    onPressed: () => ref.read(garageProvider.notifier).removeScooter(scooter.id),
+                                    style: IconButton.styleFrom(backgroundColor: Colors.black54),
+                                    icon: const Icon(Icons.delete_outline, size: 18, color: Color(0xFFFF5C5C)),
+                                  ),
+                                ),
+                              ],
                             ),
-                            const SizedBox(width: 14),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text('${scooter.brand} ${scooter.model}',
-                                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
-                                  const SizedBox(height: 2),
-                                  Text('N° de série : ${scooter.serialNumber}',
-                                      style: const TextStyle(color: VoltronColors.greyText, fontSize: 11)),
-                                  Text('Achetée le ${scooter.formattedPurchaseDate}',
-                                      style: const TextStyle(color: VoltronColors.greyText, fontSize: 11)),
-                                ],
-                              ),
-                            ),
-                            IconButton(
-                              onPressed: () => ref.read(garageProvider.notifier).removeScooter(scooter.id),
-                              icon: const Icon(Icons.delete_outline, size: 18, color: Color(0xFFFF5C5C)),
-                            ),
-                          ],
+                          ),
                         ),
+                        const SizedBox(height: 12),
+                        Text('${scooter.brand} ${scooter.model}',
+                            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                        const SizedBox(height: 2),
+                        Text('N° de série : ${scooter.serialNumber}',
+                            style: const TextStyle(color: VoltronColors.greyText, fontSize: 11)),
+                        Text('Achetée le ${scooter.formattedPurchaseDate}',
+                            style: const TextStyle(color: VoltronColors.greyText, fontSize: 11)),
                         const Divider(color: Colors.white12, height: 24),
                         _ReminderRow(
                           icon: Icons.build_circle_outlined,
@@ -103,6 +123,18 @@ class GarageScreen extends ConsumerWidget {
               ),
       ),
     );
+  }
+
+  Future<void> _pickAndUploadImage(BuildContext context, WidgetRef ref, String scooterId) async {
+    final result = await FilePicker.platform.pickFiles(type: FileType.image, withData: true);
+    final file = result?.files.firstOrNull;
+    if (file?.bytes == null) return;
+    try {
+      await ref.read(garageProvider.notifier).updateScooterImage(scooterId, file!.bytes!, file.extension ?? 'jpg');
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Échec de l\'envoi de la photo : $e')));
+    }
   }
 
   void _showAddDialog(BuildContext context, WidgetRef ref) {

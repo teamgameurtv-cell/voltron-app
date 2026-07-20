@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/app_notification.dart';
@@ -72,6 +73,7 @@ class RepairsNotifier extends StateNotifier<List<RepairOrder>> {
           date: quoteMap['quote_date'] as String,
           estimatedDelay: quoteMap['estimated_delay'] as String? ?? '',
           status: QuoteStatus.values.byName(quoteMap['status'] as String),
+          fileUrl: quoteMap['file_url'] as String?,
           lines: lines,
         );
       }
@@ -82,10 +84,12 @@ class RepairsNotifier extends StateNotifier<List<RepairOrder>> {
         clientId: o['client_id'] as String,
         steps: steps
             .map((s) => RepairStep(
+                  id: s['id'] as String,
                   label: s['label'] as String,
                   status: RepairStepStatus.values.byName(s['status'] as String),
                   date: s['step_date'] as String?,
                   position: s['position'] as int,
+                  note: s['note'] as String?,
                 ))
             .toList(),
         quote: quote,
@@ -138,6 +142,77 @@ class RepairsNotifier extends StateNotifier<List<RepairOrder>> {
           title: 'Réparation #${order.id}',
           body: 'Nouvelle étape : ${order.steps[currentIndex + 1].label}.',
         );
+  }
+
+  /// Envoie un devis (lignes détaillées et/ou fichier joint) et fait avancer le
+  /// dossier de "Diagnostic en cours" à "Devis envoyé".
+  Future<void> createQuote(
+    String orderDbId, {
+    required List<QuoteLine> lines,
+    required String estimatedDelay,
+    String? fileUrl,
+  }) async {
+    final order = state.firstWhere((o) => o.dbId == orderDbId);
+    final displayId = '${1000 + DateTime.now().millisecond}';
+    final quoteRow = await _client
+        .from('quotes')
+        .insert({
+          'order_id': orderDbId,
+          'display_id': displayId,
+          'quote_date': 'Aujourd\'hui',
+          'estimated_delay': estimatedDelay,
+          'file_url': fileUrl,
+          'status': 'pendingApproval',
+        })
+        .select()
+        .single();
+
+    if (lines.isNotEmpty) {
+      await _client.from('quote_lines').insert([
+        for (final line in lines) {'quote_id': quoteRow['id'], 'label': line.label, 'price': line.price},
+      ]);
+    }
+
+    await advanceStep(orderDbId);
+    ref.read(notificationsProvider.notifier).push(
+          type: NotificationType.repair,
+          title: 'Réparation #${order.id}',
+          body: 'Ton devis est disponible, consulte-le pour valider la réparation.',
+        );
+  }
+
+  /// Modifie un devis déjà envoyé (lignes et/ou fichier joint).
+  Future<void> updateQuote(
+    String quoteDbId, {
+    required List<QuoteLine> lines,
+    required String estimatedDelay,
+    String? fileUrl,
+  }) async {
+    await _client.from('quotes').update({
+      'estimated_delay': estimatedDelay,
+      'file_url': fileUrl,
+    }).eq('id', quoteDbId);
+
+    await _client.from('quote_lines').delete().eq('quote_id', quoteDbId);
+    if (lines.isNotEmpty) {
+      await _client.from('quote_lines').insert([
+        for (final line in lines) {'quote_id': quoteDbId, 'label': line.label, 'price': line.price},
+      ]);
+    }
+  }
+
+  Future<String> uploadQuoteFile(Uint8List bytes, String fileName) async {
+    final path = '${DateTime.now().millisecondsSinceEpoch}_$fileName';
+    await _client.storage.from('quote-files').uploadBinary(
+          path,
+          bytes,
+          fileOptions: const FileOptions(upsert: true),
+        );
+    return _client.storage.from('quote-files').getPublicUrl(path);
+  }
+
+  Future<void> updateStepNote(String stepId, String? note) async {
+    await _client.from('repair_steps').update({'note': note}).eq('id', stepId);
   }
 
   Future<void> acceptQuote(String orderDbId) async {

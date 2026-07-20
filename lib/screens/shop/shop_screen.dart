@@ -246,7 +246,7 @@ class _FeaturedBanner extends StatelessWidget {
               style: const TextStyle(color: VoltronColors.greyText, fontSize: 12),
             ),
             const SizedBox(height: 16),
-            ProductVisual(product: product, size: 64, iconSize: 64),
+            ProductVisual(product: product, size: 140, iconSize: 64),
             const SizedBox(height: 12),
             ElevatedButton(
               onPressed: () => context.push('/shop/product/${product.id}'),
@@ -333,26 +333,40 @@ class _ProductCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Stack(
-              children: [
-                Center(
-                  child: ProductVisual(product: product, size: 40, iconSize: 40),
-                ),
-                if (product.stock > 0 && product.stock <= 5)
-                  Positioned(
-                    right: 0,
-                    top: 0,
+            AspectRatio(
+              aspectRatio: 1.3,
+              child: Stack(
+                children: [
+                  Positioned.fill(
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFFF5C5C),
-                        borderRadius: BorderRadius.circular(VoltronRadii.pill),
+                        color: VoltronColors.deepBlack,
+                        borderRadius: BorderRadius.circular(VoltronRadii.sm),
                       ),
-                      child: Text('Plus que ${product.stock} !',
-                          style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: Colors.white)),
+                      child: ProductVisual(
+                        product: product,
+                        width: double.infinity,
+                        height: double.infinity,
+                        iconSize: 48,
+                      ),
                     ),
                   ),
-              ],
+                  if (product.stock > 0 && product.stock <= 5)
+                    Positioned(
+                      right: 6,
+                      top: 6,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFF5C5C),
+                          borderRadius: BorderRadius.circular(VoltronRadii.pill),
+                        ),
+                        child: Text('Plus que ${product.stock} !',
+                            style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: Colors.white)),
+                      ),
+                    ),
+                ],
+              ),
             ),
             const SizedBox(height: 10),
             Text(

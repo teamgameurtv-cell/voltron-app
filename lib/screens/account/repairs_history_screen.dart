@@ -5,6 +5,7 @@ import '../../models/repair.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/repairs_provider.dart';
 import '../../theme/voltron_theme.dart';
+import '../../widgets/client_repair_order_detail.dart';
 
 class RepairsHistoryScreen extends ConsumerWidget {
   const RepairsHistoryScreen({super.key});
@@ -30,42 +31,54 @@ class RepairsHistoryScreen extends ConsumerWidget {
                 itemBuilder: (context, index) {
                   final order = orders[index];
                   final isComplete = order.steps.last.status == RepairStepStatus.done;
-                  return Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: VoltronColors.cardBlack,
-                      borderRadius: BorderRadius.circular(VoltronRadii.md),
+                  return GestureDetector(
+                    onTap: () => showDialog(
+                      context: context,
+                      builder: (dialogContext) => Dialog(
+                        backgroundColor: Colors.transparent,
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 480),
+                          child: SingleChildScrollView(child: ClientRepairOrderDetail(order: order)),
+                        ),
+                      ),
                     ),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 44,
-                          height: 44,
-                          decoration: BoxDecoration(
-                            color: VoltronColors.deepBlack,
-                            borderRadius: BorderRadius.circular(VoltronRadii.sm),
+                    child: Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: VoltronColors.cardBlack,
+                        borderRadius: BorderRadius.circular(VoltronRadii.md),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 44,
+                            height: 44,
+                            decoration: BoxDecoration(
+                              color: VoltronColors.deepBlack,
+                              borderRadius: BorderRadius.circular(VoltronRadii.sm),
+                            ),
+                            child: const Icon(Icons.build_rounded, color: VoltronColors.electricYellow, size: 18),
                           ),
-                          child: const Icon(Icons.build_rounded, color: VoltronColors.electricYellow, size: 18),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('Dossier #${order.id}', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
-                              Text(order.scooterName, style: const TextStyle(color: VoltronColors.greyText, fontSize: 11)),
-                            ],
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('Dossier #${order.id}', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                                Text(order.scooterName, style: const TextStyle(color: VoltronColors.greyText, fontSize: 11)),
+                              ],
+                            ),
                           ),
-                        ),
-                        Text(
-                          isComplete ? 'Terminée' : order.currentStep.label,
-                          style: TextStyle(
-                            color: isComplete ? VoltronColors.success : VoltronColors.warning,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
+                          Text(
+                            isComplete ? 'Terminée' : order.currentStep.label,
+                            style: TextStyle(
+                              color: isComplete ? VoltronColors.success : VoltronColors.warning,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   );
                 },

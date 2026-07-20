@@ -3,9 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../models/repair.dart';
 import '../../models/reward.dart';
+import '../../models/shortcut_option.dart';
 import '../../providers/account_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/notifications_provider.dart';
+import '../../providers/promo_banner_provider.dart';
 import '../../providers/repairs_provider.dart';
 import '../../providers/rewards_provider.dart';
 import '../../providers/subscription_provider.dart';
@@ -32,7 +34,7 @@ class AccueilScreen extends ConsumerWidget {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
           children: [
-            _buildHeader(context, unreadCount, profile.name, profile.avatarUrl),
+            _buildHeader(context, unreadCount, profile.firstName, profile.avatarUrl),
             const SizedBox(height: 20),
             _buildLoyaltyCard(context, rewards, profile.loyaltyPoints),
             if (activePlan != null) ...[
@@ -44,11 +46,20 @@ class AccueilScreen extends ConsumerWidget {
               _buildRepairInProgress(context, activeOrder),
             ],
             const SizedBox(height: 24),
-            _sectionTitle('Raccourcis'),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                _sectionTitle('Raccourcis'),
+                GestureDetector(
+                  onTap: () => _showEditShortcutsDialog(context, ref, profile.quickShortcuts),
+                  child: const Icon(Icons.edit_outlined, size: 18, color: VoltronColors.greyText),
+                ),
+              ],
+            ),
             const SizedBox(height: 12),
-            _buildQuickAccessGrid(context),
+            _buildQuickAccessGrid(context, profile.quickShortcuts),
             const SizedBox(height: 24),
-            _buildPromoBanner(),
+            _buildPromoBanner(context, ref),
           ],
         ),
       ),
@@ -80,8 +91,8 @@ class AccueilScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildHeader(BuildContext context, int unreadCount, String clientName, String? avatarUrl) {
-    final firstName = clientName.trim().isEmpty ? null : clientName.trim().split(' ').first;
+  Widget _buildHeader(BuildContext context, int unreadCount, String clientFirstName, String? avatarUrl) {
+    final firstName = clientFirstName.trim().isEmpty ? null : clientFirstName.trim();
     return Row(
       children: [
         Image.asset('assets/images/voltron_logo.png', width: 36),
@@ -291,39 +302,76 @@ class AccueilScreen extends ConsumerWidget {
         style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700));
   }
 
-  Widget _buildQuickAccessGrid(BuildContext context) {
+  Widget _buildQuickAccessGrid(BuildContext context, List<String> shortcutIds) {
+    final selected = shortcutIds.map((id) => allShortcuts.where((s) => s.id == id).firstOrNull).whereType<ShortcutOption>().toList();
     return GridView.count(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       crossAxisCount: 4,
       mainAxisSpacing: 12,
       crossAxisSpacing: 12,
-      children: [
-        QuickAccessButton(
-          icon: Icons.calendar_month_rounded,
-          label: 'Réserver',
-          onTap: () => context.push('/repairs/book'),
-        ),
-        QuickAccessButton(
-          icon: Icons.storefront_rounded,
-          label: 'Boutique',
-          onTap: () => context.go('/shop'),
-        ),
-        QuickAccessButton(
-          icon: Icons.garage_rounded,
-          label: 'Mon Garage',
-          onTap: () => context.push('/account/garage'),
-        ),
-        QuickAccessButton(
-          icon: Icons.shield_rounded,
-          label: 'Voltron Care',
-          onTap: () => context.push('/loyalty/care'),
-        ),
-      ],
+      children: selected
+          .map((s) => QuickAccessButton(
+                icon: s.icon,
+                label: s.label,
+                onTap: () => context.push(s.route),
+              ))
+          .toList(),
     );
   }
 
-  Widget _buildPromoBanner() {
+  void _showEditShortcutsDialog(BuildContext context, WidgetRef ref, List<String> current) {
+    final selected = {...current};
+    showDialog(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          backgroundColor: VoltronColors.cardBlack,
+          title: const Text('Personnaliser mes raccourcis'),
+          content: SizedBox(
+            width: 360,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: allShortcuts
+                    .map((s) => CheckboxListTile(
+                          value: selected.contains(s.id),
+                          title: Text(s.label, style: const TextStyle(fontSize: 13)),
+                          secondary: Icon(s.icon, color: VoltronColors.electricYellow, size: 20),
+                          activeColor: VoltronColors.electricYellow,
+                          checkColor: VoltronColors.deepBlack,
+                          onChanged: (checked) => setDialogState(() {
+                            if (checked == true) {
+                              selected.add(s.id);
+                            } else {
+                              selected.remove(s.id);
+                            }
+                          }),
+                        ))
+                    .toList(),
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(dialogContext).pop(), child: const Text('Annuler')),
+            ElevatedButton(
+              onPressed: () {
+                final ordered = allShortcuts.map((s) => s.id).where(selected.contains).toList();
+                ref.read(profileProvider.notifier).updateShortcuts(ordered);
+                Navigator.of(dialogContext).pop();
+              },
+              child: const Text('ENREGISTRER'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPromoBanner(BuildContext context, WidgetRef ref) {
+    final banner = ref.watch(promoBannerProvider).valueOrNull;
+    if (banner == null || !banner.active) return const SizedBox.shrink();
+
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -336,11 +384,9 @@ class AccueilScreen extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('-15% SUR LES PNEUS',
-                    style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
+                Text(banner.title, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
                 const SizedBox(height: 4),
-                const Text('Jusqu\'au 30 juin 2024',
-                    style: TextStyle(color: VoltronColors.greyText, fontSize: 12)),
+                Text(banner.subtitle, style: const TextStyle(color: VoltronColors.greyText, fontSize: 12)),
                 const SizedBox(height: 10),
                 TextButton(
                   style: TextButton.styleFrom(
@@ -351,14 +397,13 @@ class AccueilScreen extends ConsumerWidget {
                       borderRadius: BorderRadius.circular(VoltronRadii.pill),
                     ),
                   ),
-                  onPressed: () {},
-                  child: const Text('J\'en profite',
-                      style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
+                  onPressed: () => context.push(banner.ctaRoute),
+                  child: Text(banner.ctaLabel, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
                 ),
               ],
             ),
           ),
-          const Icon(Icons.tire_repair, size: 48, color: VoltronColors.electricBlueGlow),
+          const Icon(Icons.local_offer_rounded, size: 48, color: VoltronColors.electricBlueGlow),
         ],
       ),
     );

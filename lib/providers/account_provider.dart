@@ -18,14 +18,21 @@ class ProfileNotifier extends StateNotifier<UserProfile> {
     }
   }
 
-  Future<void> update({String? name, String? email, String? phone}) async {
+  Future<void> update({String? name, String? firstName, String? email, String? phone}) async {
     final userId = _client.auth.currentUser?.id;
     if (userId == null) return;
     await _client.from('profiles').update({
       if (name != null) 'name': name,
+      if (firstName != null) 'first_name': firstName,
       if (email != null) 'email': email,
       if (phone != null) 'phone': phone,
     }).eq('id', userId);
+  }
+
+  Future<void> updateShortcuts(List<String> shortcutIds) async {
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) return;
+    await _client.from('profiles').update({'quick_shortcuts': shortcutIds}).eq('id', userId);
   }
 
   /// Envoie la photo de profil choisie dans le stockage Supabase et l'associe au compte.

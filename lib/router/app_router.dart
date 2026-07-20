@@ -38,7 +38,10 @@ import '../screens/admin/admin_clients_screen.dart';
 import '../screens/admin/admin_announcements_screen.dart';
 import '../screens/admin/admin_repairs_board_screen.dart';
 import '../screens/admin/admin_services_screen.dart';
+import '../screens/admin/admin_support_screen.dart';
 import '../screens/notifications/notifications_screen.dart';
+import '../screens/support/support_tickets_screen.dart';
+import '../screens/support/support_ticket_screen.dart';
 
 final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
 
@@ -243,6 +246,20 @@ final GoRouter appRouter = GoRouter(
       path: '/notifications',
       parentNavigatorKey: rootNavigatorKey,
       builder: (context, state) => const NotificationsScreen(),
+    ),
+    GoRoute(
+      path: '/admin/support',
+      builder: (context, state) => const AdminSupportScreen(),
+    ),
+    GoRoute(
+      path: '/support',
+      parentNavigatorKey: rootNavigatorKey,
+      builder: (context, state) => const SupportTicketsScreen(),
+    ),
+    GoRoute(
+      path: '/support/:ticketId',
+      parentNavigatorKey: rootNavigatorKey,
+      builder: (context, state) => SupportTicketScreen(ticketId: state.pathParameters['ticketId']!),
     ),
   ],
 );

@@ -135,6 +135,13 @@ class AccountScreen extends ConsumerWidget {
                 ),
               ),
             ),
+            if (activePlan?.id == 'plus') ...[
+              const SizedBox(height: 10),
+              _MenuTile(
+                item: const _AccountMenuItem('Messagerie prioritaire', Icons.support_agent_rounded, route: '/support'),
+                onTap: () => context.push('/support'),
+              ),
+            ],
             const SizedBox(height: 20),
             ..._menuItems.map((item) => _MenuTile(
                   item: item,

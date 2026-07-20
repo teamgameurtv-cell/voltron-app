@@ -12,6 +12,7 @@ class SignupScreen extends ConsumerStatefulWidget {
 }
 
 class _SignupScreenState extends ConsumerState<SignupScreen> {
+  final _firstNameController = TextEditingController();
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -19,6 +20,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
 
   @override
   void dispose() {
+    _firstNameController.dispose();
     _nameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
@@ -26,17 +28,19 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
   }
 
   Future<void> _signUp() async {
-    if (_nameController.text.trim().isEmpty ||
+    if (_firstNameController.text.trim().isEmpty ||
+        _nameController.text.trim().isEmpty ||
         _emailController.text.trim().isEmpty ||
         _passwordController.text.length < 6) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Nom, e-mail et mot de passe (6 caractères min.) requis')),
+        const SnackBar(content: Text('Prénom, nom, e-mail et mot de passe (6 caractères min.) requis')),
       );
       return;
     }
     setState(() => _isLoading = true);
     final error = await ref.read(authNotifierProvider).signUp(
           name: _nameController.text.trim(),
+          firstName: _firstNameController.text.trim(),
           email: _emailController.text.trim(),
           password: _passwordController.text,
         );
@@ -74,10 +78,20 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
               ),
               const SizedBox(height: 28),
               TextField(
+                controller: _firstNameController,
+                style: const TextStyle(color: Colors.white),
+                decoration: const InputDecoration(
+                  hintText: 'Prénom',
+                  hintStyle: TextStyle(color: VoltronColors.greyText),
+                  prefixIcon: Icon(Icons.person_outline, color: VoltronColors.greyText),
+                ),
+              ),
+              const SizedBox(height: 14),
+              TextField(
                 controller: _nameController,
                 style: const TextStyle(color: Colors.white),
                 decoration: const InputDecoration(
-                  hintText: 'Nom complet',
+                  hintText: 'Nom',
                   hintStyle: TextStyle(color: VoltronColors.greyText),
                   prefixIcon: Icon(Icons.person_outline, color: VoltronColors.greyText),
                 ),

@@ -47,12 +47,21 @@ class RepairService {
 enum RepairStepStatus { done, current, pending }
 
 class RepairStep {
+  final String id;
   final String label;
   final RepairStepStatus status;
   final String? date;
   final int position;
+  final String? note;
 
-  const RepairStep({required this.label, required this.status, this.date, this.position = 0});
+  const RepairStep({
+    required this.id,
+    required this.label,
+    required this.status,
+    this.date,
+    this.position = 0,
+    this.note,
+  });
 }
 
 class QuoteLine {
@@ -72,6 +81,7 @@ class Quote {
   final List<QuoteLine> lines;
   final String estimatedDelay;
   final QuoteStatus status;
+  final String? fileUrl;
 
   const Quote({
     required this.dbId,
@@ -80,6 +90,7 @@ class Quote {
     required this.lines,
     required this.estimatedDelay,
     this.status = QuoteStatus.pendingApproval,
+    this.fileUrl,
   });
 
   double get total => lines.fold(0, (sum, l) => sum + l.price);

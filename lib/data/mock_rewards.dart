@@ -23,6 +23,7 @@ const List<CarePlan> mockCarePlans = [
       'Priorité atelier',
       '-15% sur certaines pièces',
       'Diagnostic prioritaire',
+      'Messagerie prioritaire avec notre équipe',
     ],
   ),
 ];

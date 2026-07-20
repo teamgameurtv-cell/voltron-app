@@ -41,12 +41,31 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           password: _passwordController.text,
         );
     if (!mounted) return;
-    setState(() => _isLoading = false);
     if (error != null) {
+      setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error)));
-    } else {
-      context.go(redirect);
+      return;
     }
+    if (redirect == '/admin') {
+      final supabase = ref.read(supabaseProvider);
+      final userId = supabase.auth.currentUser?.id;
+      final row = userId == null
+          ? null
+          : await supabase.from('profiles').select('is_admin').eq('id', userId).maybeSingle();
+      final isAdmin = row?['is_admin'] == true;
+      if (!isAdmin) {
+        await supabase.auth.signOut();
+        if (!mounted) return;
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Ce compte n\'est pas administrateur.')),
+        );
+        return;
+      }
+    }
+    if (!mounted) return;
+    setState(() => _isLoading = false);
+    context.go(redirect);
   }
 
   @override

@@ -1,7 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-final supabaseProvider = Provider<SupabaseClient>((ref) => Supabase.instance.client);
+final supabaseProvider = Provider<SupabaseClient>(
+  (ref) => Supabase.instance.client,
+);
 
 final authStateProvider = StreamProvider<AuthState>((ref) {
   return ref.watch(supabaseProvider).auth.onAuthStateChange;
@@ -9,7 +11,8 @@ final authStateProvider = StreamProvider<AuthState>((ref) {
 
 final currentUserProvider = Provider<User?>((ref) {
   final authState = ref.watch(authStateProvider);
-  return authState.valueOrNull?.session?.user ?? Supabase.instance.client.auth.currentUser;
+  return authState.valueOrNull?.session?.user ??
+      Supabase.instance.client.auth.currentUser;
 });
 
 class AuthNotifier {
@@ -17,7 +20,10 @@ class AuthNotifier {
 
   AuthNotifier(this._client);
 
-  Future<String?> signIn({required String email, required String password}) async {
+  Future<String?> signIn({
+    required String email,
+    required String password,
+  }) async {
     try {
       await _client.auth.signInWithPassword(email: email, password: password);
       return null;
@@ -33,12 +39,13 @@ class AuthNotifier {
     required String password,
     required String name,
     required String firstName,
+    String address = '',
   }) async {
     try {
       await _client.auth.signUp(
         email: email,
         password: password,
-        data: {'name': name, 'first_name': firstName},
+        data: {'name': name, 'first_name': firstName, 'address': address},
       );
       return null;
     } on AuthException catch (e) {
@@ -51,4 +58,6 @@ class AuthNotifier {
   Future<void> signOut() => _client.auth.signOut();
 }
 
-final authNotifierProvider = Provider<AuthNotifier>((ref) => AuthNotifier(ref.watch(supabaseProvider)));
+final authNotifierProvider = Provider<AuthNotifier>(
+  (ref) => AuthNotifier(ref.watch(supabaseProvider)),
+);

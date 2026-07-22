@@ -30,7 +30,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final notifications = ref.watch(notificationsProvider);
+    final notifications = ref.watch(visibleNotificationsProvider);
 
     return Scaffold(
       backgroundColor: VoltronColors.deepBlack,

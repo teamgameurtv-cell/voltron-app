@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/repairs_provider.dart';
 import '../../theme/voltron_theme.dart';
+import '../../widgets/app_header.dart';
 import '../../widgets/client_repair_order_detail.dart';
 
 class RepairsScreen extends ConsumerWidget {
@@ -12,7 +13,10 @@ class RepairsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final userId = ref.watch(currentUserProvider)?.id;
-    final orders = ref.watch(repairsProvider).where((o) => o.clientId == userId).toList();
+    final orders = ref
+        .watch(repairsProvider)
+        .where((o) => o.clientId == userId)
+        .toList();
 
     return Scaffold(
       backgroundColor: VoltronColors.deepBlack,
@@ -20,15 +24,22 @@ class RepairsScreen extends ConsumerWidget {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
           children: [
+            const AppHeader(),
+            const SizedBox(height: 20),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('RÉPARATIONS',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+                const Text(
+                  'RÉPARATIONS',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+                ),
                 ElevatedButton(
                   onPressed: () => context.push('/repairs/book'),
                   style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 18,
+                      vertical: 10,
+                    ),
                   ),
                   child: const Text('RÉSERVER', style: TextStyle(fontSize: 12)),
                 ),
@@ -36,12 +47,26 @@ class RepairsScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 20),
             if (orders.isEmpty)
-              const Text('Aucun dossier en cours.', style: TextStyle(color: VoltronColors.greyText))
+              const Text(
+                'Aucun dossier en cours.',
+                style: TextStyle(color: VoltronColors.greyText),
+              )
             else
-              ...orders.map((order) => Padding(
-                    padding: const EdgeInsets.only(bottom: 24),
-                    child: ClientRepairOrderDetail(order: order),
-                  )),
+              ...orders.map(
+                (order) => Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: ClientRepairOrderDetail(
+                    order: order,
+                    collapsible: true,
+                  ),
+                ),
+              ),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed: () => context.push('/account/repairs-history'),
+              icon: const Icon(Icons.history_rounded, size: 18),
+              label: const Text('VOIR L\'HISTORIQUE COMPLET'),
+            ),
           ],
         ),
       ),

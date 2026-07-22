@@ -1,10 +1,21 @@
 import 'dart:async';
 import 'dart:typed_data';
+import 'package:csv/csv.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/product.dart';
 import 'auth_provider.dart';
+
+const List<String> csvColumns = ['nom', 'categorie', 'prix', 'stock', 'description'];
+
+class CsvImportResult {
+  final int created;
+  final int updated;
+  final int skipped;
+
+  const CsvImportResult({required this.created, required this.updated, required this.skipped});
+}
 
 class StockMovement {
   final String productId;
@@ -84,6 +95,61 @@ class CatalogNotifier extends StateNotifier<List<Product>> {
 
   Future<void> removeProduct(String id) async {
     await _client.from('products').delete().eq('id', id);
+  }
+
+  /// Génère un CSV (nom, catégorie, prix, stock, description) du catalogue actuel.
+  String exportCsv() {
+    final rows = [
+      csvColumns,
+      for (final p in state) [p.name, p.category, p.price, p.stock, p.description ?? ''],
+    ];
+    return const ListToCsvConverter().convert(rows);
+  }
+
+  /// Importe un CSV avec les mêmes colonnes que [exportCsv] : met à jour les
+  /// produits existants (correspondance par nom) et crée les nouveaux.
+  Future<CsvImportResult> importCsv(String content) async {
+    final rows = const CsvToListConverter(eol: '\n').convert(content, shouldParseNumbers: false);
+    if (rows.isEmpty) return const CsvImportResult(created: 0, updated: 0, skipped: 0);
+
+    int created = 0, updated = 0, skipped = 0;
+    for (final row in rows.skip(1)) {
+      if (row.isEmpty || (row[0] as String).trim().isEmpty) {
+        skipped++;
+        continue;
+      }
+      final name = (row[0] as String).trim();
+      final category = row.length > 1 ? (row[1] as String).trim() : '';
+      final price = row.length > 2 ? double.tryParse((row[2] as String).replaceAll(',', '.')) : null;
+      final stock = row.length > 3 ? int.tryParse(row[3] as String) : null;
+      final description = row.length > 4 ? (row[4] as String).trim() : '';
+
+      if (price == null || stock == null) {
+        skipped++;
+        continue;
+      }
+
+      final existing = state.where((p) => p.name.trim().toLowerCase() == name.toLowerCase()).firstOrNull;
+      if (existing != null) {
+        await updateProduct(existing.copyWith(
+          category: category.isEmpty ? existing.category : category,
+          price: price,
+          stock: stock,
+          description: description,
+        ));
+        updated++;
+      } else {
+        await addProduct(
+          name: name,
+          category: category.isEmpty ? 'Divers' : category,
+          price: price,
+          stock: stock,
+          description: description,
+        );
+        created++;
+      }
+    }
+    return CsvImportResult(created: created, updated: updated, skipped: skipped);
   }
 
   @override

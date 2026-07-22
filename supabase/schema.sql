@@ -20,12 +20,13 @@ create table if not exists profiles (
 create or replace function handle_new_user()
 returns trigger as $$
 begin
-  insert into public.profiles (id, name, first_name, email)
+  insert into public.profiles (id, name, first_name, email, address)
   values (
     new.id,
     coalesce(new.raw_user_meta_data->>'name', ''),
     coalesce(new.raw_user_meta_data->>'first_name', ''),
-    new.email
+    new.email,
+    coalesce(new.raw_user_meta_data->>'address', '')
   )
   on conflict (id) do nothing;
   return new;
@@ -354,6 +355,11 @@ alter table profiles add column if not exists avatar_url text;
 -- ============ PRÉNOM SÉPARÉ DU NOM ============
 alter table profiles add column if not exists first_name text not null default '';
 
+-- ============ PRÉFÉRENCES DE NOTIFICATIONS (persistées, réellement appliquées) ============
+alter table profiles add column if not exists notif_repairs boolean not null default true;
+alter table profiles add column if not exists notif_promos boolean not null default true;
+alter table profiles add column if not exists notif_loyalty boolean not null default true;
+
 insert into storage.buckets (id, name, public)
 select 'avatars', 'avatars', true
 where not exists (select 1 from storage.buckets where id = 'avatars');
@@ -655,6 +661,47 @@ create policy "scooter images owner update" on storage.objects
   for update using (
     bucket_id = 'scooter-images' and ((storage.foldername(name))[1] = auth.uid()::text or is_admin())
   );
+
+-- ============ VALIDATION DE COMMANDE BOUTIQUE ============
+-- Un client normal n'a pas le droit d'écrire dans products/stock_movements/invoices
+-- (réservé à l'admin) : cette fonction fait le nécessaire en son nom, de façon
+-- contrôlée (uniquement sa propre facture, uniquement décrémenter le stock vendu).
+create or replace function checkout_cart(p_items jsonb, p_total numeric, p_label text, p_invoice_date text)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_item jsonb;
+  v_product_id uuid;
+  v_quantity int;
+  v_stock int;
+  v_name text;
+begin
+  insert into invoices (client_id, label, invoice_date, amount)
+  values (auth.uid(), p_label, p_invoice_date, p_total);
+
+  for v_item in select * from jsonb_array_elements(p_items)
+  loop
+    v_product_id := (v_item->>'product_id')::uuid;
+    v_quantity := (v_item->>'quantity')::int;
+
+    select stock, name into v_stock, v_name from products where id = v_product_id;
+    if v_stock is not null then
+      update products set stock = greatest(0, v_stock - v_quantity) where id = v_product_id;
+      insert into stock_movements (product_id, product_name, delta) values (v_product_id, v_name, -v_quantity);
+    end if;
+  end loop;
+end;
+$$;
+
+grant execute on function checkout_cart(jsonb, numeric, text, text) to authenticated;
+
+-- ============ ADRESSE UNIQUE SUR LE PROFIL ============
+-- Remplace l'ancien carnet d'adresses multiples : une seule adresse, gérée
+-- directement dans Mes informations comme le téléphone.
+alter table profiles add column if not exists address text not null default '';
 
 -- ============ TEMPS RÉEL ============
 -- Sans ça, l'app ne reçoit jamais les mises à jour en direct : il faut

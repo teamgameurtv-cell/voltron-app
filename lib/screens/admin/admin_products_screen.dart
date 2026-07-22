@@ -1,3 +1,5 @@
+import 'dart:convert';
+import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -18,10 +20,27 @@ class AdminProductsScreen extends ConsumerWidget {
     return AdminShell(
       selected: AdminSection.products,
       title: 'PRODUITS',
-      actions: ElevatedButton.icon(
-        onPressed: () => _showProductDialog(context, ref),
-        icon: const Icon(Icons.add, size: 18),
-        label: const Text('AJOUTER'),
+      actions: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          OutlinedButton.icon(
+            onPressed: () => _exportCsv(context, ref),
+            icon: const Icon(Icons.file_download_outlined, size: 16),
+            label: const Text('EXPORTER'),
+          ),
+          const SizedBox(width: 8),
+          OutlinedButton.icon(
+            onPressed: () => _importCsv(context, ref),
+            icon: const Icon(Icons.file_upload_outlined, size: 16),
+            label: const Text('IMPORTER'),
+          ),
+          const SizedBox(width: 8),
+          ElevatedButton.icon(
+            onPressed: () => _showProductDialog(context, ref),
+            icon: const Icon(Icons.add, size: 18),
+            label: const Text('AJOUTER'),
+          ),
+        ],
       ),
       child: ListView.separated(
         itemCount: products.length,
@@ -219,5 +238,44 @@ class AdminProductsScreen extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _exportCsv(BuildContext context, WidgetRef ref) async {
+    final csvContent = ref.read(catalogProvider.notifier).exportCsv();
+    final bytes = Uint8List.fromList(utf8.encode(csvContent));
+    try {
+      await FilePicker.platform.saveFile(
+        fileName: 'produits_voltron.csv',
+        bytes: bytes,
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Échec de l\'export : $e')));
+    }
+  }
+
+  Future<void> _importCsv(BuildContext context, WidgetRef ref) async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['csv'],
+      withData: true,
+    );
+    final file = result?.files.firstOrNull;
+    if (file?.bytes == null) return;
+    try {
+      final content = utf8.decode(file!.bytes!);
+      final summary = await ref.read(catalogProvider.notifier).importCsv(content);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '${summary.created} créé(s), ${summary.updated} mis à jour, ${summary.skipped} ignoré(s)',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Échec de l\'import : $e')));
+    }
   }
 }

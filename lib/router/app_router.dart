@@ -20,7 +20,6 @@ import '../screens/loyalty/qr_code_screen.dart';
 import '../screens/account/account_screen.dart';
 import '../screens/account/garage_screen.dart';
 import '../screens/account/info_screen.dart';
-import '../screens/account/addresses_screen.dart';
 import '../screens/account/payment_methods_screen.dart';
 import '../screens/account/notification_settings_screen.dart';
 import '../screens/account/repairs_history_screen.dart';
@@ -49,18 +48,9 @@ final GoRouter appRouter = GoRouter(
   navigatorKey: rootNavigatorKey,
   initialLocation: '/',
   routes: [
-    GoRoute(
-      path: '/',
-      builder: (context, state) => const SplashScreen(),
-    ),
-    GoRoute(
-      path: '/login',
-      builder: (context, state) => const LoginScreen(),
-    ),
-    GoRoute(
-      path: '/signup',
-      builder: (context, state) => const SignupScreen(),
-    ),
+    GoRoute(path: '/', builder: (context, state) => const SplashScreen()),
+    GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
+    GoRoute(path: '/signup', builder: (context, state) => const SignupScreen()),
     GoRoute(
       path: '/reset-password',
       builder: (context, state) => const ResetPasswordScreen(),
@@ -69,137 +59,142 @@ final GoRouter appRouter = GoRouter(
       builder: (context, state, navigationShell) =>
           HomeShell(navigationShell: navigationShell),
       branches: [
-        StatefulShellBranch(routes: [
-          GoRoute(
-            path: '/home',
-            builder: (context, state) => const AccueilScreen(),
-          ),
-        ]),
-        StatefulShellBranch(routes: [
-          GoRoute(
-            path: '/shop',
-            builder: (context, state) => const ShopScreen(),
-            routes: [
-              GoRoute(
-                path: 'product/:id',
-                parentNavigatorKey: rootNavigatorKey,
-                builder: (context, state) => ProductDetailScreen(
-                  productId: state.pathParameters['id']!,
-                ),
-              ),
-              GoRoute(
-                path: 'cart',
-                parentNavigatorKey: rootNavigatorKey,
-                builder: (context, state) => const CartScreen(),
-              ),
-            ],
-          ),
-        ]),
-        StatefulShellBranch(routes: [
-          GoRoute(
-            path: '/repairs',
-            builder: (context, state) => const RepairsScreen(),
-            routes: [
-              GoRoute(
-                path: 'book',
-                parentNavigatorKey: rootNavigatorKey,
-                builder: (context, state) => const BookingScreen(),
-              ),
-              GoRoute(
-                path: 'quote/:orderId',
-                parentNavigatorKey: rootNavigatorKey,
-                builder: (context, state) => QuoteScreen(
-                  orderId: state.pathParameters['orderId']!,
-                ),
-              ),
-            ],
-          ),
-        ]),
-        StatefulShellBranch(routes: [
-          GoRoute(
-            path: '/loyalty',
-            builder: (context, state) => const LoyaltyScreen(),
-            routes: [
-              GoRoute(
-                path: 'care',
-                parentNavigatorKey: rootNavigatorKey,
-                builder: (context, state) => const VoltronCareScreen(),
-                routes: [
-                  GoRoute(
-                    path: 'payment/:planId',
-                    parentNavigatorKey: rootNavigatorKey,
-                    builder: (context, state) => CarePaymentScreen(
-                      planId: state.pathParameters['planId']!,
-                    ),
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: '/home',
+              builder: (context, state) => const AccueilScreen(),
+            ),
+          ],
+        ),
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: '/shop',
+              builder: (context, state) => const ShopScreen(),
+              routes: [
+                GoRoute(
+                  path: 'product/:id',
+                  parentNavigatorKey: rootNavigatorKey,
+                  builder: (context, state) => ProductDetailScreen(
+                    productId: state.pathParameters['id']!,
                   ),
-                ],
-              ),
-              GoRoute(
-                path: 'qr',
-                parentNavigatorKey: rootNavigatorKey,
-                builder: (context, state) => const QrCodeScreen(),
-              ),
-            ],
-          ),
-        ]),
-        StatefulShellBranch(routes: [
-          GoRoute(
-            path: '/account',
-            builder: (context, state) => const AccountScreen(),
-            routes: [
-              GoRoute(
-                path: 'garage',
-                parentNavigatorKey: rootNavigatorKey,
-                builder: (context, state) => const GarageScreen(),
-              ),
-              GoRoute(
-                path: 'info',
-                parentNavigatorKey: rootNavigatorKey,
-                builder: (context, state) => const InfoScreen(),
-              ),
-              GoRoute(
-                path: 'addresses',
-                parentNavigatorKey: rootNavigatorKey,
-                builder: (context, state) => const AddressesScreen(),
-              ),
-              GoRoute(
-                path: 'payment-methods',
-                parentNavigatorKey: rootNavigatorKey,
-                builder: (context, state) => const PaymentMethodsScreen(),
-              ),
-              GoRoute(
-                path: 'notification-settings',
-                parentNavigatorKey: rootNavigatorKey,
-                builder: (context, state) => const NotificationSettingsScreen(),
-              ),
-              GoRoute(
-                path: 'repairs-history',
-                parentNavigatorKey: rootNavigatorKey,
-                builder: (context, state) => const RepairsHistoryScreen(),
-              ),
-              GoRoute(
-                path: 'invoices',
-                parentNavigatorKey: rootNavigatorKey,
-                builder: (context, state) => const InvoicesScreen(),
-              ),
-              GoRoute(
-                path: 'warranty',
-                parentNavigatorKey: rootNavigatorKey,
-                builder: (context, state) => const WarrantyScreen(),
-              ),
-              GoRoute(
-                path: 'help',
-                parentNavigatorKey: rootNavigatorKey,
-                builder: (context, state) => const HelpScreen(),
-              ),
-              GoRoute(
-                path: 'about',
-                parentNavigatorKey: rootNavigatorKey,
-                builder: (context, state) => const AboutScreen(),
-              ),
-            ],
-          ),
-        ]),
+                ),
+                GoRoute(
+                  path: 'cart',
+                  parentNavigatorKey: rootNavigatorKey,
+                  builder: (context, state) => const CartScreen(),
+                ),
+              ],
+            ),
+          ],
+        ),
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: '/repairs',
+              builder: (context, state) => const RepairsScreen(),
+              routes: [
+                GoRoute(
+                  path: 'book',
+                  parentNavigatorKey: rootNavigatorKey,
+                  builder: (context, state) => const BookingScreen(),
+                ),
+                GoRoute(
+                  path: 'quote/:orderId',
+                  parentNavigatorKey: rootNavigatorKey,
+                  builder: (context, state) =>
+                      QuoteScreen(orderId: state.pathParameters['orderId']!),
+                ),
+              ],
+            ),
+          ],
+        ),
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: '/loyalty',
+              builder: (context, state) => const LoyaltyScreen(),
+              routes: [
+                GoRoute(
+                  path: 'care',
+                  parentNavigatorKey: rootNavigatorKey,
+                  builder: (context, state) => const VoltronCareScreen(),
+                  routes: [
+                    GoRoute(
+                      path: 'payment/:planId',
+                      parentNavigatorKey: rootNavigatorKey,
+                      builder: (context, state) => CarePaymentScreen(
+                        planId: state.pathParameters['planId']!,
+                      ),
+                    ),
+                  ],
+                ),
+                GoRoute(
+                  path: 'qr',
+                  parentNavigatorKey: rootNavigatorKey,
+                  builder: (context, state) => const QrCodeScreen(),
+                ),
+              ],
+            ),
+          ],
+        ),
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: '/account',
+              builder: (context, state) => const AccountScreen(),
+              routes: [
+                GoRoute(
+                  path: 'garage',
+                  parentNavigatorKey: rootNavigatorKey,
+                  builder: (context, state) => const GarageScreen(),
+                ),
+                GoRoute(
+                  path: 'info',
+                  parentNavigatorKey: rootNavigatorKey,
+                  builder: (context, state) => const InfoScreen(),
+                ),
+                GoRoute(
+                  path: 'payment-methods',
+                  parentNavigatorKey: rootNavigatorKey,
+                  builder: (context, state) => const PaymentMethodsScreen(),
+                ),
+                GoRoute(
+                  path: 'notification-settings',
+                  parentNavigatorKey: rootNavigatorKey,
+                  builder: (context, state) =>
+                      const NotificationSettingsScreen(),
+                ),
+                GoRoute(
+                  path: 'repairs-history',
+                  parentNavigatorKey: rootNavigatorKey,
+                  builder: (context, state) => const RepairsHistoryScreen(),
+                ),
+                GoRoute(
+                  path: 'invoices',
+                  parentNavigatorKey: rootNavigatorKey,
+                  builder: (context, state) => const InvoicesScreen(),
+                ),
+                GoRoute(
+                  path: 'warranty',
+                  parentNavigatorKey: rootNavigatorKey,
+                  builder: (context, state) => const WarrantyScreen(),
+                ),
+                GoRoute(
+                  path: 'help',
+                  parentNavigatorKey: rootNavigatorKey,
+                  builder: (context, state) => const HelpScreen(),
+                ),
+                GoRoute(
+                  path: 'about',
+                  parentNavigatorKey: rootNavigatorKey,
+                  builder: (context, state) => const AboutScreen(),
+                ),
+              ],
+            ),
+          ],
+        ),
       ],
     ),
     GoRoute(
@@ -259,7 +254,8 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: '/support/:ticketId',
       parentNavigatorKey: rootNavigatorKey,
-      builder: (context, state) => SupportTicketScreen(ticketId: state.pathParameters['ticketId']!),
+      builder: (context, state) =>
+          SupportTicketScreen(ticketId: state.pathParameters['ticketId']!),
     ),
   ],
 );

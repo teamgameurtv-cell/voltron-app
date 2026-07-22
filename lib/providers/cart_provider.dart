@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/product.dart';
+import 'auth_provider.dart';
 
 class CartItem {
   final Product product;
@@ -67,3 +69,32 @@ final cartTotalProvider = Provider<double>((ref) {
   final items = ref.watch(cartProvider);
   return items.fold<double>(0, (sum, item) => sum + item.subtotal);
 });
+
+/// Ce que "valider la commande" doit réellement faire : tracer l'achat
+/// (facture, historique) et décrémenter le stock vendu.
+class CheckoutActions {
+  final SupabaseClient _client;
+
+  CheckoutActions(this._client);
+
+  Future<void> checkout(List<CartItem> items, double total) async {
+    if (items.isEmpty) return;
+
+    final itemCount = items.fold<int>(0, (sum, i) => sum + i.quantity);
+    final label = items.length == 1
+        ? '${items.first.product.name}${items.first.quantity > 1 ? ' x${items.first.quantity}' : ''}'
+        : '$itemCount articles (${items.map((i) => i.product.name).join(', ')})';
+    final now = DateTime.now();
+    final formattedDate =
+        '${now.day.toString().padLeft(2, '0')}/${now.month.toString().padLeft(2, '0')}/${now.year}';
+
+    await _client.rpc('checkout_cart', params: {
+      'p_items': items.map((i) => {'product_id': i.product.id, 'quantity': i.quantity}).toList(),
+      'p_total': total,
+      'p_label': label,
+      'p_invoice_date': formattedDate,
+    });
+  }
+}
+
+final checkoutActionsProvider = Provider<CheckoutActions>((ref) => CheckoutActions(ref.watch(supabaseProvider)));

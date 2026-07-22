@@ -9,6 +9,7 @@ import '../../providers/loyalty_goals_provider.dart';
 import '../../providers/rewards_provider.dart';
 import '../../providers/subscription_provider.dart';
 import '../../theme/voltron_theme.dart';
+import '../../widgets/app_header.dart';
 
 class _LoyaltyGoal {
   final String id;
@@ -49,6 +50,13 @@ const List<_LoyaltyGoal> _loyaltyGoals = [
     subtitle: 'Personnalise ton compte',
     points: 15,
     icon: Icons.account_circle_outlined,
+  ),
+  _LoyaltyGoal(
+    id: 'address_added',
+    title: 'Ajoute ton adresse',
+    subtitle: 'Renseigne-la dans Mes informations',
+    points: 15,
+    icon: Icons.location_on_outlined,
   ),
   _LoyaltyGoal(
     id: 'vehicle_added',
@@ -92,6 +100,8 @@ class LoyaltyScreen extends ConsumerWidget {
         return ref.watch(currentUserProvider)?.emailConfirmedAt != null;
       case 'avatar_added':
         return (ref.watch(profileProvider).avatarUrl ?? '').isNotEmpty;
+      case 'address_added':
+        return ref.watch(profileProvider).address.trim().isNotEmpty;
       case 'vehicle_added':
         return ref.watch(garageProvider).isNotEmpty;
       case 'first_purchase':
@@ -107,14 +117,30 @@ class LoyaltyScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final rewards = ref.watch(rewardsProvider);
     final loyaltyPoints = ref.watch(profileProvider).loyaltyPoints;
-    final claimedGoals = ref.watch(claimedLoyaltyGoalsProvider).valueOrNull ?? {};
+    final claimedGoals =
+        ref.watch(claimedLoyaltyGoalsProvider).valueOrNull ?? {};
 
     for (final goal in _loyaltyGoals) {
-      if (!goal.manual && !claimedGoals.contains(goal.id) && _isEligible(goal.id, ref)) {
-        Future.microtask(() => ref.read(loyaltyGoalsNotifierProvider).claim(goal.id, goal.points));
+      if (!goal.manual &&
+          !claimedGoals.contains(goal.id) &&
+          _isEligible(goal.id, ref)) {
+        Future.microtask(
+          () => ref
+              .read(loyaltyGoalsNotifierProvider)
+              .claim(goal.id, goal.points),
+        );
       }
     }
-    final completedCount = _loyaltyGoals.where((g) => claimedGoals.contains(g.id)).length;
+    final completedCount = _loyaltyGoals
+        .where((g) => claimedGoals.contains(g.id))
+        .length;
+
+    final nextRewards = rewards.where((r) => r.points > loyaltyPoints).toList()
+      ..sort((a, b) => a.points.compareTo(b.points));
+    final nextReward = nextRewards.isEmpty ? null : nextRewards.first;
+    final pointsProgress = nextReward == null
+        ? 1.0
+        : (loyaltyPoints / nextReward.points).clamp(0.0, 1.0);
 
     return Scaffold(
       backgroundColor: VoltronColors.deepBlack,
@@ -122,38 +148,104 @@ class LoyaltyScreen extends ConsumerWidget {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
           children: [
-            const Text('FIDÉLITÉ', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+            const AppHeader(),
+            const SizedBox(height: 20),
+            const Text(
+              'FIDÉLITÉ',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+            ),
             const SizedBox(height: 16),
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(VoltronRadii.lg),
                 gradient: VoltronColors.blueGlow,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('MES POINTS',
-                      style: TextStyle(fontSize: 11, letterSpacing: 1, color: Colors.white70, fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 6),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.baseline,
-                    textBaseline: TextBaseline.alphabetic,
-                    children: [
-                      Text('$loyaltyPoints',
-                          style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: Colors.white)),
-                      const SizedBox(width: 6),
-                      const Text('pts', style: TextStyle(color: Colors.white70)),
-                    ],
+                boxShadow: [
+                  BoxShadow(
+                    color: VoltronColors.electricBlue.withValues(alpha: 0.3),
+                    blurRadius: 24,
+                    offset: const Offset(0, 10),
                   ),
-                  const SizedBox(height: 12),
-                  OutlinedButton(
-                    onPressed: () => _showHistoryDialog(context),
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: Colors.white54),
-                      padding: const EdgeInsets.symmetric(vertical: 10),
+                ],
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'MES POINTS',
+                          style: TextStyle(
+                            fontSize: 11,
+                            letterSpacing: 1,
+                            color: Colors.white70,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.baseline,
+                          textBaseline: TextBaseline.alphabetic,
+                          children: [
+                            Text(
+                              '$loyaltyPoints',
+                              style: const TextStyle(
+                                fontSize: 32,
+                                fontWeight: FontWeight.w900,
+                                color: Colors.white,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            const Text(
+                              'pts',
+                              style: TextStyle(color: Colors.white70),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        OutlinedButton(
+                          onPressed: () => _showHistoryDialog(context),
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: Colors.white54),
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                          ),
+                          child: const Text(
+                            'Voir mon historique',
+                            style: TextStyle(fontSize: 12),
+                          ),
+                        ),
+                        if (nextReward != null) ...[
+                          const SizedBox(height: 14),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(
+                              VoltronRadii.pill,
+                            ),
+                            child: LinearProgressIndicator(
+                              value: pointsProgress,
+                              minHeight: 6,
+                              backgroundColor: Colors.white24,
+                              valueColor: const AlwaysStoppedAnimation(
+                                VoltronColors.electricYellow,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            'Plus que ${nextReward.points - loyaltyPoints} pts pour "${nextReward.label}"',
+                            style: const TextStyle(
+                              color: Colors.white70,
+                              fontSize: 11,
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
-                    child: const Text('Voir mon historique', style: TextStyle(fontSize: 12)),
+                  ),
+                  const Icon(
+                    Icons.bolt_rounded,
+                    color: VoltronColors.electricYellow,
+                    size: 40,
                   ),
                 ],
               ),
@@ -168,10 +260,22 @@ class LoyaltyScreen extends ConsumerWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('OBJECTIFS',
-                    style: TextStyle(fontSize: 12, letterSpacing: 1, fontWeight: FontWeight.w700, color: VoltronColors.greyText)),
-                Text('$completedCount/${_loyaltyGoals.length} complétés',
-                    style: const TextStyle(fontSize: 11, color: VoltronColors.greyText)),
+                const Text(
+                  'OBJECTIFS',
+                  style: TextStyle(
+                    fontSize: 12,
+                    letterSpacing: 1,
+                    fontWeight: FontWeight.w700,
+                    color: VoltronColors.greyText,
+                  ),
+                ),
+                Text(
+                  '$completedCount/${_loyaltyGoals.length} complétés',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: VoltronColors.greyText,
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 10),
@@ -181,146 +285,284 @@ class LoyaltyScreen extends ConsumerWidget {
                 value: completedCount / _loyaltyGoals.length,
                 minHeight: 8,
                 backgroundColor: VoltronColors.cardBlack,
-                valueColor: const AlwaysStoppedAnimation(VoltronColors.electricYellow),
+                valueColor: const AlwaysStoppedAnimation(
+                  VoltronColors.electricYellow,
+                ),
               ),
             ),
-            const SizedBox(height: 14),
-            ..._loyaltyGoals.map((goal) {
-              final isDone = claimedGoals.contains(goal.id);
-              return Container(
-                margin: const EdgeInsets.only(bottom: 10),
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: VoltronColors.cardBlack,
-                  borderRadius: BorderRadius.circular(VoltronRadii.md),
-                  border: Border.all(color: isDone ? VoltronColors.success.withValues(alpha: 0.5) : Colors.transparent),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 40,
-                      height: 40,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: VoltronColors.deepBlack,
-                        borderRadius: BorderRadius.circular(VoltronRadii.sm),
-                      ),
-                      child: Icon(
-                        isDone ? Icons.check_rounded : goal.icon,
-                        color: isDone ? VoltronColors.success : VoltronColors.electricYellow,
-                        size: 20,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(goal.title,
-                              style: TextStyle(
-                                fontWeight: FontWeight.w600,
-                                fontSize: 13,
-                                decoration: isDone ? TextDecoration.lineThrough : null,
-                                color: isDone ? VoltronColors.greyText : Colors.white,
-                              )),
-                          const SizedBox(height: 2),
-                          Text(goal.subtitle, style: const TextStyle(color: VoltronColors.greyText, fontSize: 11)),
-                        ],
-                      ),
-                    ),
-                    if (isDone)
-                      const Icon(Icons.check_circle_rounded, color: VoltronColors.success, size: 20)
-                    else if (goal.manual)
-                      TextButton(
-                        style: TextButton.styleFrom(
-                          backgroundColor: VoltronColors.electricYellow,
-                          foregroundColor: VoltronColors.deepBlack,
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(VoltronRadii.pill)),
-                        ),
-                        onPressed: () async {
-                          final credited = await ref.read(loyaltyGoalsNotifierProvider).claim(goal.id, goal.points);
-                          if (!context.mounted) return;
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text(credited ? '+${goal.points} points crédités !' : 'Déjà réclamé')),
-                          );
-                        },
-                        child: Text('+${goal.points} pts', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
-                      )
-                    else
-                      Text('+${goal.points} pts',
-                          style: const TextStyle(color: VoltronColors.electricYellow, fontSize: 12, fontWeight: FontWeight.w700)),
-                  ],
-                ),
-              );
-            }),
-            const SizedBox(height: 24),
-            const Text('RÉCOMPENSES DISPONIBLES',
-                style: TextStyle(fontSize: 12, letterSpacing: 1, fontWeight: FontWeight.w700, color: VoltronColors.greyText)),
-            const SizedBox(height: 12),
-            ...rewards.map((reward) {
-              final canAfford = loyaltyPoints >= reward.points;
-              return Container(
-                  margin: const EdgeInsets.only(bottom: 10),
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: VoltronColors.cardBlack,
-                    borderRadius: BorderRadius.circular(VoltronRadii.md),
+            const SizedBox(height: 6),
+            Theme(
+              data: Theme.of(
+                context,
+              ).copyWith(dividerColor: Colors.transparent),
+              child: ExpansionTile(
+                tilePadding: EdgeInsets.zero,
+                childrenPadding: const EdgeInsets.only(top: 8),
+                shape: const Border(),
+                collapsedShape: const Border(),
+                iconColor: VoltronColors.electricYellow,
+                collapsedIconColor: VoltronColors.greyText,
+                title: const Text(
+                  'Voir le détail des objectifs',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: VoltronColors.greyText,
                   ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(
-                          color: VoltronColors.deepBlack,
-                          borderRadius: BorderRadius.circular(VoltronRadii.sm),
-                        ),
-                        child: Icon(reward.icon, color: VoltronColors.electricYellow, size: 20),
+                ),
+                children: _loyaltyGoals.map((goal) {
+                  final isDone = claimedGoals.contains(goal.id);
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 10),
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: VoltronColors.cardBlack,
+                      borderRadius: BorderRadius.circular(VoltronRadii.md),
+                      border: Border.all(
+                        color: isDone
+                            ? VoltronColors.success.withValues(alpha: 0.5)
+                            : Colors.transparent,
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(reward.label,
-                                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                            const SizedBox(height: 2),
-                            Text('${reward.points} points',
-                                style: const TextStyle(color: VoltronColors.greyText, fontSize: 11)),
-                          ],
-                        ),
-                      ),
-                      TextButton(
-                        style: TextButton.styleFrom(
-                          backgroundColor: canAfford ? VoltronColors.electricYellow : VoltronColors.deepBlack,
-                          foregroundColor: canAfford ? VoltronColors.deepBlack : VoltronColors.greyText,
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(VoltronRadii.pill),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 40,
+                          height: 40,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: VoltronColors.deepBlack,
+                            borderRadius: BorderRadius.circular(
+                              VoltronRadii.sm,
+                            ),
+                          ),
+                          child: Icon(
+                            isDone ? Icons.check_rounded : goal.icon,
+                            color: isDone
+                                ? VoltronColors.success
+                                : VoltronColors.electricYellow,
+                            size: 20,
                           ),
                         ),
-                        onPressed: !canAfford
-                            ? null
-                            : () async {
-                                try {
-                                  final redemption = await ref.read(rewardsProvider.notifier).redeem(reward.id);
-                                  if (!context.mounted) return;
-                                  _showRedemptionDialog(context, redemption);
-                                } catch (e) {
-                                  if (!context.mounted) return;
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text('Pas assez de points pour cette récompense')),
-                                  );
-                                }
-                              },
-                        child: Text(canAfford ? 'Échanger' : 'Pas assez de points',
-                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
-                      ),
-                    ],
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                goal.title,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 13,
+                                  decoration: isDone
+                                      ? TextDecoration.lineThrough
+                                      : null,
+                                  color: isDone
+                                      ? VoltronColors.greyText
+                                      : Colors.white,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                goal.subtitle,
+                                style: const TextStyle(
+                                  color: VoltronColors.greyText,
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (isDone)
+                          const Icon(
+                            Icons.check_circle_rounded,
+                            color: VoltronColors.success,
+                            size: 20,
+                          )
+                        else if (goal.manual)
+                          TextButton(
+                            style: TextButton.styleFrom(
+                              backgroundColor: VoltronColors.electricYellow,
+                              foregroundColor: VoltronColors.deepBlack,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 8,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(
+                                  VoltronRadii.pill,
+                                ),
+                              ),
+                            ),
+                            onPressed: () async {
+                              final credited = await ref
+                                  .read(loyaltyGoalsNotifierProvider)
+                                  .claim(goal.id, goal.points);
+                              if (!context.mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    credited
+                                        ? '+${goal.points} points crédités !'
+                                        : 'Déjà réclamé',
+                                  ),
+                                ),
+                              );
+                            },
+                            child: Text(
+                              '+${goal.points} pts',
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          )
+                        else
+                          Text(
+                            '+${goal.points} pts',
+                            style: const TextStyle(
+                              color: VoltronColors.electricYellow,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+            const SizedBox(height: 24),
+            const Text(
+              'RÉCOMPENSES DISPONIBLES',
+              style: TextStyle(
+                fontSize: 12,
+                letterSpacing: 1,
+                fontWeight: FontWeight.w700,
+                color: VoltronColors.greyText,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Theme(
+              data: Theme.of(
+                context,
+              ).copyWith(dividerColor: Colors.transparent),
+              child: ExpansionTile(
+                tilePadding: EdgeInsets.zero,
+                childrenPadding: const EdgeInsets.only(top: 8),
+                shape: const Border(),
+                collapsedShape: const Border(),
+                iconColor: VoltronColors.electricYellow,
+                collapsedIconColor: VoltronColors.greyText,
+                title: const Text(
+                  'Voir le détail des récompenses',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: VoltronColors.greyText,
                   ),
-                );
-            }),
+                ),
+                children: rewards.map((reward) {
+                  final canAfford = loyaltyPoints >= reward.points;
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 10),
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: VoltronColors.cardBlack,
+                      borderRadius: BorderRadius.circular(VoltronRadii.md),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: VoltronColors.deepBlack,
+                            borderRadius: BorderRadius.circular(
+                              VoltronRadii.sm,
+                            ),
+                          ),
+                          child: Icon(
+                            reward.icon,
+                            color: VoltronColors.electricYellow,
+                            size: 20,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                reward.label,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 13,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                '${reward.points} points',
+                                style: const TextStyle(
+                                  color: VoltronColors.greyText,
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        TextButton(
+                          style: TextButton.styleFrom(
+                            backgroundColor: canAfford
+                                ? VoltronColors.electricYellow
+                                : VoltronColors.deepBlack,
+                            foregroundColor: canAfford
+                                ? VoltronColors.deepBlack
+                                : VoltronColors.greyText,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 8,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(
+                                VoltronRadii.pill,
+                              ),
+                            ),
+                          ),
+                          onPressed: !canAfford
+                              ? null
+                              : () async {
+                                  try {
+                                    final redemption = await ref
+                                        .read(rewardsProvider.notifier)
+                                        .redeem(reward.id);
+                                    if (!context.mounted) return;
+                                    _showRedemptionDialog(context, redemption);
+                                  } catch (e) {
+                                    if (!context.mounted) return;
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          'Pas assez de points pour cette récompense',
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                },
+                          child: Text(
+                            canAfford ? 'Échanger' : 'Pas assez de points',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
             const SizedBox(height: 20),
             Container(
               padding: const EdgeInsets.all(16),
@@ -334,11 +576,22 @@ class LoyaltyScreen extends ConsumerWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: const [
-                        Text('VOLTRON CARE',
-                            style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: VoltronColors.electricBlueGlow)),
+                        Text(
+                          'VOLTRON CARE',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 13,
+                            color: VoltronColors.electricBlueGlow,
+                          ),
+                        ),
                         SizedBox(height: 4),
-                        Text('Prenez soin de votre trottinette en toute sérénité.',
-                            style: TextStyle(color: VoltronColors.greyText, fontSize: 12)),
+                        Text(
+                          'Prenez soin de votre trottinette en toute sérénité.',
+                          style: TextStyle(
+                            color: VoltronColors.greyText,
+                            fontSize: 12,
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -369,16 +622,26 @@ class LoyaltyScreen extends ConsumerWidget {
               return historyAsync.when(
                 loading: () => const Padding(
                   padding: EdgeInsets.symmetric(vertical: 20),
-                  child: Center(child: CircularProgressIndicator(color: VoltronColors.electricYellow)),
+                  child: Center(
+                    child: CircularProgressIndicator(
+                      color: VoltronColors.electricYellow,
+                    ),
+                  ),
                 ),
-                error: (err, _) => Text('Erreur : $err', style: const TextStyle(color: VoltronColors.greyText)),
+                error: (err, _) => Text(
+                  'Erreur : $err',
+                  style: const TextStyle(color: VoltronColors.greyText),
+                ),
                 data: (rows) {
                   if (rows.isEmpty) {
                     return const Padding(
                       padding: EdgeInsets.symmetric(vertical: 20),
                       child: Text(
                         'Aucun historique pour l\'instant. Complète des objectifs fidélité pour gagner tes premiers points !',
-                        style: TextStyle(color: VoltronColors.greyText, fontSize: 13),
+                        style: TextStyle(
+                          color: VoltronColors.greyText,
+                          fontSize: 13,
+                        ),
                       ),
                     );
                   }
@@ -386,15 +649,26 @@ class LoyaltyScreen extends ConsumerWidget {
                     height: 320,
                     child: ListView.separated(
                       itemCount: rows.length,
-                      separatorBuilder: (_, __) => const Divider(color: Colors.white24, height: 1),
+                      separatorBuilder: (_, __) =>
+                          const Divider(color: Colors.white24, height: 1),
                       itemBuilder: (context, index) {
                         final row = rows[index];
                         final goalId = row['goal_id'] as String;
-                        final title = _loyaltyGoals.firstWhere(
-                          (g) => g.id == goalId,
-                          orElse: () => _LoyaltyGoal(id: goalId, title: goalId, subtitle: '', points: 0, icon: Icons.star),
-                        ).title;
-                        final date = DateTime.tryParse(row['claimed_at'] as String)?.toLocal();
+                        final title = _loyaltyGoals
+                            .firstWhere(
+                              (g) => g.id == goalId,
+                              orElse: () => _LoyaltyGoal(
+                                id: goalId,
+                                title: goalId,
+                                subtitle: '',
+                                points: 0,
+                                icon: Icons.star,
+                              ),
+                            )
+                            .title;
+                        final date = DateTime.tryParse(
+                          row['claimed_at'] as String,
+                        )?.toLocal();
                         return Padding(
                           padding: const EdgeInsets.symmetric(vertical: 10),
                           child: Row(
@@ -403,17 +677,31 @@ class LoyaltyScreen extends ConsumerWidget {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text(title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                                    Text(
+                                      title,
+                                      style: const TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
                                     if (date != null)
                                       Text(
                                         '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}',
-                                        style: const TextStyle(color: VoltronColors.greyText, fontSize: 11),
+                                        style: const TextStyle(
+                                          color: VoltronColors.greyText,
+                                          fontSize: 11,
+                                        ),
                                       ),
                                   ],
                                 ),
                               ),
-                              Text('+${row['points']} pts',
-                                  style: const TextStyle(color: VoltronColors.electricYellow, fontWeight: FontWeight.w700)),
+                              Text(
+                                '+${row['points']} pts',
+                                style: const TextStyle(
+                                  color: VoltronColors.electricYellow,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
                             ],
                           ),
                         );
@@ -426,13 +714,19 @@ class LoyaltyScreen extends ConsumerWidget {
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.of(dialogContext).pop(), child: const Text('Fermer')),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Fermer'),
+          ),
         ],
       ),
     );
   }
 
-  void _showRedemptionDialog(BuildContext context, RewardRedemption redemption) {
+  void _showRedemptionDialog(
+    BuildContext context,
+    RewardRedemption redemption,
+  ) {
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -442,13 +736,23 @@ class LoyaltyScreen extends ConsumerWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(redemption.rewardLabel, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+            Text(
+              redemption.rewardLabel,
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+            ),
             const SizedBox(height: 4),
-            Text('${redemption.pointsSpent} points dépensés',
-                style: const TextStyle(color: VoltronColors.greyText, fontSize: 12)),
+            Text(
+              '${redemption.pointsSpent} points dépensés',
+              style: const TextStyle(
+                color: VoltronColors.greyText,
+                fontSize: 12,
+              ),
+            ),
             const SizedBox(height: 20),
-            const Text('Présente ce code en boutique pour en profiter :',
-                style: TextStyle(color: VoltronColors.greyText, fontSize: 12)),
+            const Text(
+              'Présente ce code en boutique pour en profiter :',
+              style: TextStyle(color: VoltronColors.greyText, fontSize: 12),
+            ),
             const SizedBox(height: 8),
             Container(
               width: double.infinity,
@@ -459,18 +763,23 @@ class LoyaltyScreen extends ConsumerWidget {
                 borderRadius: BorderRadius.circular(VoltronRadii.md),
                 border: Border.all(color: VoltronColors.electricYellow),
               ),
-              child: Text(redemption.code,
-                  style: const TextStyle(
-                    color: VoltronColors.electricYellow,
-                    fontSize: 24,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 4,
-                  )),
+              child: Text(
+                redemption.code,
+                style: const TextStyle(
+                  color: VoltronColors.electricYellow,
+                  fontSize: 24,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 4,
+                ),
+              ),
             ),
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.of(dialogContext).pop(), child: const Text('Fermer')),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Fermer'),
+          ),
         ],
       ),
     );

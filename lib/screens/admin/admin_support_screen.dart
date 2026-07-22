@@ -134,7 +134,15 @@ class _TicketDetail extends ConsumerWidget {
                 ),
                 if (ticket != null && ticket.status != TicketStatus.closed)
                   TextButton(
-                    onPressed: () => ref.read(supportActionsProvider).updateStatus(ticketId, TicketStatus.closed),
+                    onPressed: () async {
+                      final actions = ref.read(supportActionsProvider);
+                      await actions.sendMessage(
+                        ticketId: ticketId,
+                        senderRole: SenderRole.admin,
+                        body: 'Cette discussion a été clôturée par notre équipe.',
+                      );
+                      await actions.updateStatus(ticketId, TicketStatus.closed);
+                    },
                     child: const Text('CLÔTURER', style: TextStyle(fontSize: 11)),
                   ),
               ],

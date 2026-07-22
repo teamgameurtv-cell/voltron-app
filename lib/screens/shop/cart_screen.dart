@@ -20,6 +20,7 @@ class CartScreen extends ConsumerStatefulWidget {
 class _CartScreenState extends ConsumerState<CartScreen> {
   _DeliveryMode _deliveryMode = _DeliveryMode.livraison;
   final _promoController = TextEditingController();
+  bool _isCheckingOut = false;
 
   @override
   void dispose() {
@@ -227,21 +228,40 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                         ),
                         const SizedBox(height: 14),
                         ElevatedButton(
-                          onPressed: () {
-                            final itemCount = items.fold<int>(0, (sum, item) => sum + item.quantity);
-                            ref.read(notificationsProvider.notifier).push(
-                                  type: NotificationType.order,
-                                  title: 'Commande confirmée',
-                                  body:
-                                      '$itemCount article${itemCount > 1 ? 's' : ''} pour ${total.toStringAsFixed(2).replaceAll('.', ',')} €. Merci pour ta confiance !',
-                                );
-                            ref.read(cartProvider.notifier).clear();
-                            context.pop();
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Commande validée !')),
-                            );
-                          },
-                          child: const Text('VALIDER LA COMMANDE'),
+                          onPressed: items.isEmpty || _isCheckingOut
+                              ? null
+                              : () async {
+                                  setState(() => _isCheckingOut = true);
+                                  final itemCount = items.fold<int>(0, (sum, item) => sum + item.quantity);
+                                  try {
+                                    await ref.read(checkoutActionsProvider).checkout(items, total);
+                                    ref.read(notificationsProvider.notifier).push(
+                                          type: NotificationType.order,
+                                          title: 'Commande confirmée',
+                                          body:
+                                              '$itemCount article${itemCount > 1 ? 's' : ''} pour ${total.toStringAsFixed(2).replaceAll('.', ',')} €. Merci pour ta confiance !',
+                                        );
+                                    ref.read(cartProvider.notifier).clear();
+                                    if (!context.mounted) return;
+                                    context.pop();
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(content: Text('Commande validée !')),
+                                    );
+                                  } catch (e) {
+                                    if (!context.mounted) return;
+                                    setState(() => _isCheckingOut = false);
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text('Échec de la commande : $e')),
+                                    );
+                                  }
+                                },
+                          child: _isCheckingOut
+                              ? const SizedBox(
+                                  height: 18,
+                                  width: 18,
+                                  child: CircularProgressIndicator(strokeWidth: 2, color: VoltronColors.deepBlack),
+                                )
+                              : const Text('VALIDER LA COMMANDE'),
                         ),
                       ],
                     ),

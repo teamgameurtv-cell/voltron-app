@@ -6,13 +6,12 @@ import '../../models/reward.dart';
 import '../../models/shortcut_option.dart';
 import '../../providers/account_provider.dart';
 import '../../providers/auth_provider.dart';
-import '../../providers/notifications_provider.dart';
 import '../../providers/promo_banner_provider.dart';
 import '../../providers/repairs_provider.dart';
 import '../../providers/rewards_provider.dart';
 import '../../providers/subscription_provider.dart';
 import '../../theme/voltron_theme.dart';
-import '../../widgets/client_avatar.dart';
+import '../../widgets/app_header.dart';
 import '../../widgets/quick_access_button.dart';
 
 class AccueilScreen extends ConsumerWidget {
@@ -20,13 +19,14 @@ class AccueilScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final unreadCount = ref.watch(unreadNotificationsCountProvider);
     final activePlan = ref.watch(subscriptionProvider);
     final rewards = ref.watch(rewardsProvider);
     final profile = ref.watch(profileProvider);
     final userId = ref.watch(currentUserProvider)?.id;
-    final myActiveOrders =
-        ref.watch(repairsProvider).where((o) => o.clientId == userId && !o.isComplete).toList();
+    final myActiveOrders = ref
+        .watch(repairsProvider)
+        .where((o) => o.clientId == userId && !o.isComplete)
+        .toList();
     final activeOrder = myActiveOrders.isEmpty ? null : myActiveOrders.first;
     return Scaffold(
       backgroundColor: VoltronColors.deepBlack,
@@ -34,7 +34,7 @@ class AccueilScreen extends ConsumerWidget {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
           children: [
-            _buildHeader(context, unreadCount, profile.firstName, profile.avatarUrl),
+            const AppHeader(),
             const SizedBox(height: 20),
             _buildLoyaltyCard(context, rewards, profile.loyaltyPoints),
             if (activePlan != null) ...[
@@ -51,8 +51,16 @@ class AccueilScreen extends ConsumerWidget {
               children: [
                 _sectionTitle('Raccourcis'),
                 GestureDetector(
-                  onTap: () => _showEditShortcutsDialog(context, ref, profile.quickShortcuts),
-                  child: const Icon(Icons.edit_outlined, size: 18, color: VoltronColors.greyText),
+                  onTap: () => _showEditShortcutsDialog(
+                    context,
+                    ref,
+                    profile.quickShortcuts,
+                  ),
+                  child: const Icon(
+                    Icons.edit_outlined,
+                    size: 18,
+                    color: VoltronColors.greyText,
+                  ),
                 ),
               ],
             ),
@@ -74,79 +82,48 @@ class AccueilScreen extends ConsumerWidget {
         decoration: BoxDecoration(
           color: VoltronColors.cardBlack,
           borderRadius: BorderRadius.circular(VoltronRadii.md),
-          border: Border.all(color: VoltronColors.success.withValues(alpha: 0.5)),
+          border: Border.all(
+            color: VoltronColors.success.withValues(alpha: 0.5),
+          ),
         ),
         child: Row(
           children: [
-            const Icon(Icons.verified_rounded, color: VoltronColors.success, size: 20),
+            const Icon(
+              Icons.verified_rounded,
+              color: VoltronColors.success,
+              size: 20,
+            ),
             const SizedBox(width: 10),
             Expanded(
-              child: Text('Voltron Care $planName actif',
-                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+              child: Text(
+                'Voltron Care $planName actif',
+                style: const TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                ),
+              ),
             ),
-            const Icon(Icons.chevron_right_rounded, color: VoltronColors.greyText),
+            const Icon(
+              Icons.chevron_right_rounded,
+              color: VoltronColors.greyText,
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildHeader(BuildContext context, int unreadCount, String clientFirstName, String? avatarUrl) {
-    final firstName = clientFirstName.trim().isEmpty ? null : clientFirstName.trim();
-    return Row(
-      children: [
-        Image.asset('assets/images/voltron_logo.png', width: 36),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                firstName != null ? 'Salut $firstName !' : 'Salut !',
-                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
-              ),
-              const SizedBox(height: 2),
-              const Text(
-                'Prêt à rouler ?',
-                style: TextStyle(color: VoltronColors.greyText, fontSize: 13),
-              ),
-            ],
-          ),
-        ),
-        Stack(
-          children: [
-            IconButton(
-              onPressed: () => context.push('/notifications'),
-              icon: const Icon(Icons.notifications_none_rounded, size: 26),
-            ),
-            if (unreadCount > 0)
-              Positioned(
-                right: 10,
-                top: 10,
-                child: Container(
-                  width: 8,
-                  height: 8,
-                  decoration: const BoxDecoration(
-                    color: VoltronColors.electricYellow,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-              ),
-          ],
-        ),
-        GestureDetector(
-          onTap: () => context.push('/account'),
-          child: ClientAvatar(avatarUrl: avatarUrl, radius: 20),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildLoyaltyCard(BuildContext context, List<Reward> rewards, int loyaltyPoints) {
+  Widget _buildLoyaltyCard(
+    BuildContext context,
+    List<Reward> rewards,
+    int loyaltyPoints,
+  ) {
     final nextRewards = rewards.where((r) => r.points > loyaltyPoints).toList()
       ..sort((a, b) => a.points.compareTo(b.points));
     final nextReward = nextRewards.isEmpty ? null : nextRewards.first;
-    final progress = nextReward == null ? 1.0 : (loyaltyPoints / nextReward.points).clamp(0.0, 1.0);
+    final progress = nextReward == null
+        ? 1.0
+        : (loyaltyPoints / nextReward.points).clamp(0.0, 1.0);
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -210,11 +187,17 @@ class AccueilScreen extends ConsumerWidget {
                   onPressed: () => context.push('/loyalty/qr'),
                   style: OutlinedButton.styleFrom(
                     side: const BorderSide(color: Colors.white54),
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 8,
+                    ),
                     minimumSize: Size.zero,
                   ),
                   icon: const Icon(Icons.qr_code_2_rounded, size: 16),
-                  label: const Text('Voir mon QR code', style: TextStyle(fontSize: 12)),
+                  label: const Text(
+                    'Voir mon QR code',
+                    style: TextStyle(fontSize: 12),
+                  ),
                 ),
                 if (nextReward != null) ...[
                   const SizedBox(height: 14),
@@ -224,7 +207,9 @@ class AccueilScreen extends ConsumerWidget {
                       value: progress,
                       minHeight: 6,
                       backgroundColor: Colors.white24,
-                      valueColor: const AlwaysStoppedAnimation(VoltronColors.electricYellow),
+                      valueColor: const AlwaysStoppedAnimation(
+                        VoltronColors.electricYellow,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 6),
@@ -236,7 +221,11 @@ class AccueilScreen extends ConsumerWidget {
               ],
             ),
           ),
-          const Icon(Icons.bolt_rounded, color: VoltronColors.electricYellow, size: 40),
+          const Icon(
+            Icons.bolt_rounded,
+            color: VoltronColors.electricYellow,
+            size: 40,
+          ),
         ],
       ),
     );
@@ -248,62 +237,84 @@ class AccueilScreen extends ConsumerWidget {
         borderRadius: BorderRadius.circular(VoltronRadii.md),
         onTap: () => context.go('/repairs'),
         child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            Container(
-              width: 52,
-              height: 52,
-              decoration: BoxDecoration(
-                color: VoltronColors.deepBlack,
-                borderRadius: BorderRadius.circular(VoltronRadii.sm),
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  color: VoltronColors.deepBlack,
+                  borderRadius: BorderRadius.circular(VoltronRadii.sm),
+                ),
+                child: const Icon(
+                  Icons.electric_scooter_rounded,
+                  color: VoltronColors.electricYellow,
+                ),
               ),
-              child: const Icon(Icons.electric_scooter_rounded,
-                  color: VoltronColors.electricYellow),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Dossier #${order.id}',
-                      style: const TextStyle(fontWeight: FontWeight.w700)),
-                  Text(order.scooterName,
-                      style: const TextStyle(color: VoltronColors.greyText, fontSize: 12)),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Container(
-                        width: 7,
-                        height: 7,
-                        decoration: const BoxDecoration(
-                          color: VoltronColors.warning,
-                          shape: BoxShape.circle,
-                        ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Dossier #${order.id}',
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    Text(
+                      order.scooterName,
+                      style: const TextStyle(
+                        color: VoltronColors.greyText,
+                        fontSize: 12,
                       ),
-                      const SizedBox(width: 6),
-                      Text(order.currentStep.label,
-                          style: const TextStyle(color: VoltronColors.warning, fontSize: 12)),
-                    ],
-                  ),
-                ],
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Container(
+                          width: 7,
+                          height: 7,
+                          decoration: const BoxDecoration(
+                            color: VoltronColors.warning,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          order.currentStep.label,
+                          style: const TextStyle(
+                            color: VoltronColors.warning,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
-            ),
-            const Icon(Icons.chevron_right_rounded, color: VoltronColors.greyText),
-          ],
-        ),
+              const Icon(
+                Icons.chevron_right_rounded,
+                color: VoltronColors.greyText,
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
   Widget _sectionTitle(String title) {
-    return Text(title,
-        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700));
+    return Text(
+      title,
+      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+    );
   }
 
   Widget _buildQuickAccessGrid(BuildContext context, List<String> shortcutIds) {
-    final selected = shortcutIds.map((id) => allShortcuts.where((s) => s.id == id).firstOrNull).whereType<ShortcutOption>().toList();
+    final selected = shortcutIds
+        .map((id) => allShortcuts.where((s) => s.id == id).firstOrNull)
+        .whereType<ShortcutOption>()
+        .toList();
     return GridView.count(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
@@ -311,16 +322,22 @@ class AccueilScreen extends ConsumerWidget {
       mainAxisSpacing: 12,
       crossAxisSpacing: 12,
       children: selected
-          .map((s) => QuickAccessButton(
-                icon: s.icon,
-                label: s.label,
-                onTap: () => context.push(s.route),
-              ))
+          .map(
+            (s) => QuickAccessButton(
+              icon: s.icon,
+              label: s.label,
+              onTap: () => context.push(s.route),
+            ),
+          )
           .toList(),
     );
   }
 
-  void _showEditShortcutsDialog(BuildContext context, WidgetRef ref, List<String> current) {
+  void _showEditShortcutsDialog(
+    BuildContext context,
+    WidgetRef ref,
+    List<String> current,
+  ) {
     final selected = {...current};
     showDialog(
       context: context,
@@ -334,29 +351,44 @@ class AccueilScreen extends ConsumerWidget {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: allShortcuts
-                    .map((s) => CheckboxListTile(
-                          value: selected.contains(s.id),
-                          title: Text(s.label, style: const TextStyle(fontSize: 13)),
-                          secondary: Icon(s.icon, color: VoltronColors.electricYellow, size: 20),
-                          activeColor: VoltronColors.electricYellow,
-                          checkColor: VoltronColors.deepBlack,
-                          onChanged: (checked) => setDialogState(() {
-                            if (checked == true) {
-                              selected.add(s.id);
-                            } else {
-                              selected.remove(s.id);
-                            }
-                          }),
-                        ))
+                    .map(
+                      (s) => CheckboxListTile(
+                        value: selected.contains(s.id),
+                        title: Text(
+                          s.label,
+                          style: const TextStyle(fontSize: 13),
+                        ),
+                        secondary: Icon(
+                          s.icon,
+                          color: VoltronColors.electricYellow,
+                          size: 20,
+                        ),
+                        activeColor: VoltronColors.electricYellow,
+                        checkColor: VoltronColors.deepBlack,
+                        onChanged: (checked) => setDialogState(() {
+                          if (checked == true) {
+                            selected.add(s.id);
+                          } else {
+                            selected.remove(s.id);
+                          }
+                        }),
+                      ),
+                    )
                     .toList(),
               ),
             ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.of(dialogContext).pop(), child: const Text('Annuler')),
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Annuler'),
+            ),
             ElevatedButton(
               onPressed: () {
-                final ordered = allShortcuts.map((s) => s.id).where(selected.contains).toList();
+                final ordered = allShortcuts
+                    .map((s) => s.id)
+                    .where(selected.contains)
+                    .toList();
                 ref.read(profileProvider.notifier).updateShortcuts(ordered);
                 Navigator.of(dialogContext).pop();
               },
@@ -384,26 +416,51 @@ class AccueilScreen extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(banner.title, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
+                Text(
+                  banner.title,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 13,
+                  ),
+                ),
                 const SizedBox(height: 4),
-                Text(banner.subtitle, style: const TextStyle(color: VoltronColors.greyText, fontSize: 12)),
+                Text(
+                  banner.subtitle,
+                  style: const TextStyle(
+                    color: VoltronColors.greyText,
+                    fontSize: 12,
+                  ),
+                ),
                 const SizedBox(height: 10),
                 TextButton(
                   style: TextButton.styleFrom(
                     backgroundColor: VoltronColors.electricYellow,
                     foregroundColor: VoltronColors.deepBlack,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(VoltronRadii.pill),
                     ),
                   ),
                   onPressed: () => context.push(banner.ctaRoute),
-                  child: Text(banner.ctaLabel, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
+                  child: Text(
+                    banner.ctaLabel,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 12,
+                    ),
+                  ),
                 ),
               ],
             ),
           ),
-          const Icon(Icons.local_offer_rounded, size: 48, color: VoltronColors.electricBlueGlow),
+          const Icon(
+            Icons.local_offer_rounded,
+            size: 48,
+            color: VoltronColors.electricBlueGlow,
+          ),
         ],
       ),
     );

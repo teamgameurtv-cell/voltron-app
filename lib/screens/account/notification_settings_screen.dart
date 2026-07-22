@@ -9,8 +9,8 @@ class NotificationSettingsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final prefs = ref.watch(notificationPrefsProvider);
-    final notifier = ref.read(notificationPrefsProvider.notifier);
+    final profile = ref.watch(profileProvider);
+    final notifier = ref.read(profileProvider.notifier);
 
     return Scaffold(
       backgroundColor: VoltronColors.deepBlack,
@@ -23,22 +23,22 @@ class NotificationSettingsScreen extends ConsumerWidget {
           padding: const EdgeInsets.all(20),
           children: [
             SwitchListTile(
-              value: prefs.repairs,
-              onChanged: (v) => notifier.update(repairs: v),
+              value: profile.notifRepairs,
+              onChanged: (v) => notifier.updateNotificationPrefs(repairs: v),
               activeColor: VoltronColors.electricYellow,
               title: const Text('Suivi de réparation', style: TextStyle(fontSize: 13)),
               subtitle: const Text('Avancement de tes dossiers', style: TextStyle(color: VoltronColors.greyText, fontSize: 11)),
             ),
             SwitchListTile(
-              value: prefs.promos,
-              onChanged: (v) => notifier.update(promos: v),
+              value: profile.notifPromos,
+              onChanged: (v) => notifier.updateNotificationPrefs(promos: v),
               activeColor: VoltronColors.electricYellow,
               title: const Text('Promotions', style: TextStyle(fontSize: 13)),
               subtitle: const Text('Offres et nouveautés boutique', style: TextStyle(color: VoltronColors.greyText, fontSize: 11)),
             ),
             SwitchListTile(
-              value: prefs.loyalty,
-              onChanged: (v) => notifier.update(loyalty: v),
+              value: profile.notifLoyalty,
+              onChanged: (v) => notifier.updateNotificationPrefs(loyalty: v),
               activeColor: VoltronColors.electricYellow,
               title: const Text('Fidélité', style: TextStyle(fontSize: 13)),
               subtitle: const Text('Points, récompenses et Voltron Care', style: TextStyle(color: VoltronColors.greyText, fontSize: 11)),

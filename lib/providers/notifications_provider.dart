@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/app_notification.dart';
+import 'account_provider.dart';
 import 'auth_provider.dart';
 
 class NotificationsNotifier extends StateNotifier<List<AppNotification>> {
@@ -69,6 +70,25 @@ final notificationsProvider = StateNotifierProvider<NotificationsNotifier, List<
   (ref) => NotificationsNotifier(ref.watch(supabaseProvider)),
 );
 
+/// Notifications à afficher au client, en respectant ses préférences
+/// (Compte > Notifications) : un type désactivé disparaît de la liste et du badge.
+final visibleNotificationsProvider = Provider<List<AppNotification>>((ref) {
+  final profile = ref.watch(profileProvider);
+  return ref.watch(notificationsProvider).where((n) {
+    switch (n.type) {
+      case NotificationType.repair:
+      case NotificationType.reminder:
+        return profile.notifRepairs;
+      case NotificationType.promo:
+        return profile.notifPromos;
+      case NotificationType.loyalty:
+        return profile.notifLoyalty;
+      case NotificationType.order:
+        return true;
+    }
+  }).toList();
+});
+
 final unreadNotificationsCountProvider = Provider<int>((ref) {
-  return ref.watch(notificationsProvider).where((n) => !n.read).length;
+  return ref.watch(visibleNotificationsProvider).where((n) => !n.read).length;
 });

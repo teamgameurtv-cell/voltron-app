@@ -16,6 +16,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _addressController = TextEditingController();
   bool _isLoading = false;
 
   @override
@@ -24,6 +25,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
     _nameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
+    _addressController.dispose();
     super.dispose();
   }
 
@@ -33,25 +35,38 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
         _emailController.text.trim().isEmpty ||
         _passwordController.text.length < 6) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Prénom, nom, e-mail et mot de passe (6 caractères min.) requis')),
+        const SnackBar(
+          content: Text(
+            'Prénom, nom, e-mail et mot de passe (6 caractères min.) requis',
+          ),
+        ),
       );
       return;
     }
     setState(() => _isLoading = true);
-    final error = await ref.read(authNotifierProvider).signUp(
+    final error = await ref
+        .read(authNotifierProvider)
+        .signUp(
           name: _nameController.text.trim(),
           firstName: _firstNameController.text.trim(),
           email: _emailController.text.trim(),
           password: _passwordController.text,
+          address: _addressController.text.trim(),
         );
     if (!mounted) return;
     setState(() => _isLoading = false);
     if (error != null) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error)));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error)));
       return;
     }
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Compte créé ! Vérifie ta boîte mail pour confirmer, puis connecte-toi.')),
+      const SnackBar(
+        content: Text(
+          'Compte créé ! Vérifie ta boîte mail pour confirmer, puis connecte-toi.',
+        ),
+      ),
     );
     context.pop();
   }
@@ -61,7 +76,10 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
     return Scaffold(
       backgroundColor: VoltronColors.deepBlack,
       appBar: AppBar(
-        leading: IconButton(onPressed: () => context.pop(), icon: const Icon(Icons.arrow_back_ios_new_rounded)),
+        leading: IconButton(
+          onPressed: () => context.pop(),
+          icon: const Icon(Icons.arrow_back_ios_new_rounded),
+        ),
         title: const Text('CRÉER UN COMPTE'),
       ),
       body: SafeArea(
@@ -83,7 +101,10 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                 decoration: const InputDecoration(
                   hintText: 'Prénom',
                   hintStyle: TextStyle(color: VoltronColors.greyText),
-                  prefixIcon: Icon(Icons.person_outline, color: VoltronColors.greyText),
+                  prefixIcon: Icon(
+                    Icons.person_outline,
+                    color: VoltronColors.greyText,
+                  ),
                 ),
               ),
               const SizedBox(height: 14),
@@ -93,7 +114,10 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                 decoration: const InputDecoration(
                   hintText: 'Nom',
                   hintStyle: TextStyle(color: VoltronColors.greyText),
-                  prefixIcon: Icon(Icons.person_outline, color: VoltronColors.greyText),
+                  prefixIcon: Icon(
+                    Icons.person_outline,
+                    color: VoltronColors.greyText,
+                  ),
                 ),
               ),
               const SizedBox(height: 14),
@@ -104,7 +128,10 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                 decoration: const InputDecoration(
                   hintText: 'Adresse e-mail',
                   hintStyle: TextStyle(color: VoltronColors.greyText),
-                  prefixIcon: Icon(Icons.mail_outline, color: VoltronColors.greyText),
+                  prefixIcon: Icon(
+                    Icons.mail_outline,
+                    color: VoltronColors.greyText,
+                  ),
                 ),
               ),
               const SizedBox(height: 14),
@@ -115,7 +142,23 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                 decoration: const InputDecoration(
                   hintText: 'Mot de passe (6 caractères min.)',
                   hintStyle: TextStyle(color: VoltronColors.greyText),
-                  prefixIcon: Icon(Icons.lock_outline, color: VoltronColors.greyText),
+                  prefixIcon: Icon(
+                    Icons.lock_outline,
+                    color: VoltronColors.greyText,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+              TextField(
+                controller: _addressController,
+                style: const TextStyle(color: Colors.white),
+                decoration: const InputDecoration(
+                  hintText: 'Adresse (optionnel)',
+                  hintStyle: TextStyle(color: VoltronColors.greyText),
+                  prefixIcon: Icon(
+                    Icons.location_on_outlined,
+                    color: VoltronColors.greyText,
+                  ),
                 ),
               ),
               const SizedBox(height: 24),
@@ -125,7 +168,10 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                     ? const SizedBox(
                         height: 18,
                         width: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: VoltronColors.deepBlack),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: VoltronColors.deepBlack,
+                        ),
                       )
                     : const Text('CRÉER MON COMPTE'),
               ),

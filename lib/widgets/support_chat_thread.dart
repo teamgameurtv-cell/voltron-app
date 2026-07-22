@@ -156,9 +156,12 @@ class _MessageBubble extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (message.isImage && message.attachmentUrl != null)
-              ClipRRect(
-                borderRadius: BorderRadius.circular(VoltronRadii.sm),
-                child: Image.network(message.attachmentUrl!, width: 200, fit: BoxFit.cover),
+              GestureDetector(
+                onTap: () => _openFullscreenImage(context, message.attachmentUrl!),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(VoltronRadii.sm),
+                  child: Image.network(message.attachmentUrl!, width: 200, fit: BoxFit.cover),
+                ),
               )
             else if (message.isVideo && message.attachmentUrl != null)
               GestureDetector(
@@ -190,4 +193,35 @@ class _MessageBubble extends StatelessWidget {
       ),
     );
   }
+}
+
+void _openFullscreenImage(BuildContext context, String url) {
+  Navigator.of(context).push(
+    PageRouteBuilder(
+      opaque: false,
+      barrierColor: Colors.black,
+      pageBuilder: (context, _, __) => Scaffold(
+        backgroundColor: Colors.black,
+        body: Stack(
+          children: [
+            Center(
+              child: InteractiveViewer(
+                minScale: 0.5,
+                maxScale: 5,
+                child: Image.network(url),
+              ),
+            ),
+            Positioned(
+              top: 40,
+              right: 16,
+              child: IconButton(
+                onPressed: () => Navigator.of(context).pop(),
+                icon: const Icon(Icons.close_rounded, color: Colors.white, size: 28),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
 }

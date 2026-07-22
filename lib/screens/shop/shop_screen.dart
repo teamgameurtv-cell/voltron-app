@@ -6,6 +6,7 @@ import '../../models/product.dart';
 import '../../providers/cart_provider.dart';
 import '../../providers/catalog_provider.dart';
 import '../../theme/voltron_theme.dart';
+import '../../widgets/app_header.dart';
 import '../../widgets/product_visual.dart';
 
 class ShopScreen extends ConsumerStatefulWidget {
@@ -34,15 +35,20 @@ class _ShopScreenState extends ConsumerState<ShopScreen> {
     if (products.isEmpty) {
       return const Scaffold(
         backgroundColor: VoltronColors.deepBlack,
-        body: Center(child: CircularProgressIndicator(color: VoltronColors.electricYellow)),
+        body: Center(
+          child: CircularProgressIndicator(color: VoltronColors.electricYellow),
+        ),
       );
     }
 
     final featured = products.first;
     final isFiltering = _selectedCategory != null || _query.trim().isNotEmpty;
     final filtered = products.where((p) {
-      final matchesCategory = _selectedCategory == null || p.category == _selectedCategory;
-      final matchesQuery = _query.trim().isEmpty || p.name.toLowerCase().contains(_query.trim().toLowerCase());
+      final matchesCategory =
+          _selectedCategory == null || p.category == _selectedCategory;
+      final matchesQuery =
+          _query.trim().isEmpty ||
+          p.name.toLowerCase().contains(_query.trim().toLowerCase());
       return matchesCategory && matchesQuery;
     }).toList();
     final bestSellers = products.where((p) => p.isBestSeller).toList();
@@ -53,10 +59,10 @@ class _ShopScreenState extends ConsumerState<ShopScreen> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
           children: [
+            const AppHeader(),
+            const SizedBox(height: 20),
             Row(
               children: [
-                Image.asset('assets/images/voltron_logo.png', width: 32),
-                const SizedBox(width: 10),
                 const Expanded(
                   child: Text(
                     'BOUTIQUE',
@@ -80,8 +86,10 @@ class _ShopScreenState extends ConsumerState<ShopScreen> {
                             color: VoltronColors.electricYellow,
                             shape: BoxShape.circle,
                           ),
-                          constraints:
-                              const BoxConstraints(minWidth: 18, minHeight: 18),
+                          constraints: const BoxConstraints(
+                            minWidth: 18,
+                            minHeight: 18,
+                          ),
                           child: Text(
                             '$cartCount',
                             textAlign: TextAlign.center,
@@ -105,11 +113,18 @@ class _ShopScreenState extends ConsumerState<ShopScreen> {
               decoration: InputDecoration(
                 hintText: 'Rechercher un produit...',
                 hintStyle: const TextStyle(color: VoltronColors.greyText),
-                prefixIcon: const Icon(Icons.search, color: VoltronColors.greyText),
+                prefixIcon: const Icon(
+                  Icons.search,
+                  color: VoltronColors.greyText,
+                ),
                 suffixIcon: _query.isEmpty
                     ? null
                     : IconButton(
-                        icon: const Icon(Icons.close, color: VoltronColors.greyText, size: 18),
+                        icon: const Icon(
+                          Icons.close,
+                          color: VoltronColors.greyText,
+                          size: 18,
+                        ),
                         onPressed: () => setState(() {
                           _query = '';
                           _searchController.clear();
@@ -137,8 +152,13 @@ class _ShopScreenState extends ConsumerState<ShopScreen> {
                 if (_selectedCategory != null)
                   TextButton(
                     onPressed: () => setState(() => _selectedCategory = null),
-                    child: const Text('Réinitialiser',
-                        style: TextStyle(color: VoltronColors.electricBlueGlow, fontSize: 12)),
+                    child: const Text(
+                      'Réinitialiser',
+                      style: TextStyle(
+                        color: VoltronColors.electricBlueGlow,
+                        fontSize: 12,
+                      ),
+                    ),
                   ),
               ],
             ),
@@ -172,7 +192,9 @@ class _ShopScreenState extends ConsumerState<ShopScreen> {
               const SizedBox(height: 24),
             ],
             Text(
-              isFiltering ? 'RÉSULTATS (${filtered.length})' : 'TOUS LES PRODUITS',
+              isFiltering
+                  ? 'RÉSULTATS (${filtered.length})'
+                  : 'TOUS LES PRODUITS',
               style: const TextStyle(
                 fontSize: 12,
                 letterSpacing: 1,
@@ -184,7 +206,10 @@ class _ShopScreenState extends ConsumerState<ShopScreen> {
             if (filtered.isEmpty)
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 20),
-                child: Text('Aucun produit ne correspond.', style: TextStyle(color: VoltronColors.greyText)),
+                child: Text(
+                  'Aucun produit ne correspond.',
+                  style: TextStyle(color: VoltronColors.greyText),
+                ),
               )
             else
               GridView.builder(
@@ -197,7 +222,8 @@ class _ShopScreenState extends ConsumerState<ShopScreen> {
                   crossAxisSpacing: 12,
                   childAspectRatio: 0.85,
                 ),
-                itemBuilder: (context, index) => _ProductCard(product: filtered[index]),
+                itemBuilder: (context, index) =>
+                    _ProductCard(product: filtered[index]),
               ),
           ],
         ),
@@ -243,7 +269,10 @@ class _FeaturedBanner extends StatelessWidget {
             const SizedBox(height: 6),
             Text(
               product.tagline ?? '',
-              style: const TextStyle(color: VoltronColors.greyText, fontSize: 12),
+              style: const TextStyle(
+                color: VoltronColors.greyText,
+                fontSize: 12,
+              ),
             ),
             const SizedBox(height: 16),
             ProductVisual(product: product, size: 140, iconSize: 64),
@@ -251,7 +280,10 @@ class _FeaturedBanner extends StatelessWidget {
             ElevatedButton(
               onPressed: () => context.push('/shop/product/${product.id}'),
               style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 10,
+                ),
               ),
               child: const Text('DÉCOUVRIR'),
             ),
@@ -267,50 +299,61 @@ class _CategoryGrid extends StatelessWidget {
   final String? selected;
   final ValueChanged<String> onSelect;
 
-  const _CategoryGrid({required this.categories, required this.selected, required this.onSelect});
+  const _CategoryGrid({
+    required this.categories,
+    required this.selected,
+    required this.onSelect,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Row(
-      children: categories
-          .map(
-            (cat) {
-              final isSelected = cat.label == selected;
-              return Expanded(
-                child: GestureDetector(
-                  onTap: () => onSelect(cat.label),
-                  child: Column(
-                    children: [
-                      Container(
-                        width: 52,
-                        height: 52,
-                        decoration: BoxDecoration(
-                          color: isSelected ? VoltronColors.electricBlue : VoltronColors.cardBlack,
-                          borderRadius: BorderRadius.circular(VoltronRadii.md),
-                          border: Border.all(
-                            color: isSelected ? VoltronColors.electricYellow : Colors.transparent,
-                            width: 2,
-                          ),
-                        ),
-                        child: Icon(cat.icon, color: isSelected ? Colors.white : VoltronColors.electricBlueGlow),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        cat.label,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: isSelected ? VoltronColors.electricYellow : Colors.white70,
-                          fontWeight: isSelected ? FontWeight.w700 : FontWeight.w400,
-                        ),
-                      ),
-                    ],
+      children: categories.map((cat) {
+        final isSelected = cat.label == selected;
+        return Expanded(
+          child: GestureDetector(
+            onTap: () => onSelect(cat.label),
+            child: Column(
+              children: [
+                Container(
+                  width: 52,
+                  height: 52,
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? VoltronColors.electricBlue
+                        : VoltronColors.cardBlack,
+                    borderRadius: BorderRadius.circular(VoltronRadii.md),
+                    border: Border.all(
+                      color: isSelected
+                          ? VoltronColors.electricYellow
+                          : Colors.transparent,
+                      width: 2,
+                    ),
+                  ),
+                  child: Icon(
+                    cat.icon,
+                    color: isSelected
+                        ? Colors.white
+                        : VoltronColors.electricBlueGlow,
                   ),
                 ),
-              );
-            },
-          )
-          .toList(),
+                const SizedBox(height: 6),
+                Text(
+                  cat.label,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: isSelected
+                        ? VoltronColors.electricYellow
+                        : Colors.white70,
+                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w400,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      }).toList(),
     );
   }
 }
@@ -356,13 +399,24 @@ class _ProductCard extends StatelessWidget {
                       right: 6,
                       top: 6,
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 3,
+                        ),
                         decoration: BoxDecoration(
                           color: const Color(0xFFFF5C5C),
-                          borderRadius: BorderRadius.circular(VoltronRadii.pill),
+                          borderRadius: BorderRadius.circular(
+                            VoltronRadii.pill,
+                          ),
                         ),
-                        child: Text('Plus que ${product.stock} !',
-                            style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: Colors.white)),
+                        child: Text(
+                          'Plus que ${product.stock} !',
+                          style: const TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white,
+                          ),
+                        ),
                       ),
                     ),
                 ],
@@ -381,15 +435,25 @@ class _ProductCard extends StatelessWidget {
               children: [
                 Text(
                   product.formattedPrice,
-                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
                 Row(
                   children: [
-                    const Icon(Icons.star_rounded, size: 14, color: VoltronColors.electricYellow),
+                    const Icon(
+                      Icons.star_rounded,
+                      size: 14,
+                      color: VoltronColors.electricYellow,
+                    ),
                     const SizedBox(width: 2),
                     Text(
                       product.rating.toString(),
-                      style: const TextStyle(fontSize: 11, color: VoltronColors.greyText),
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: VoltronColors.greyText,
+                      ),
                     ),
                   ],
                 ),

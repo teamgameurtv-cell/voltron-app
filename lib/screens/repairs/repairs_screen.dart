@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../models/booking.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/bookings_provider.dart';
 import '../../providers/repairs_provider.dart';
 import '../../theme/voltron_theme.dart';
 import '../../widgets/app_header.dart';
+import '../../widgets/client_booking_card.dart';
 import '../../widgets/client_repair_order_detail.dart';
 
 class RepairsScreen extends ConsumerWidget {
@@ -13,9 +16,28 @@ class RepairsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final userId = ref.watch(currentUserProvider)?.id;
-    final orders = ref
+    final allOrders = ref
         .watch(repairsProvider)
         .where((o) => o.clientId == userId)
+        .toList();
+    final orders = allOrders.where((o) => !o.archived).toList();
+    final archivedOrders = allOrders.where((o) => o.archived).toList();
+    final bookings = ref
+        .watch(bookingsProvider)
+        .where((b) => b.clientId == userId)
+        .toList();
+    final needsResponse = bookings
+        .where((b) => b.status == BookingStatus.rescheduled)
+        .toList();
+    final activeBookings = bookings
+        .where(
+          (b) =>
+              b.status == BookingStatus.pending ||
+              b.status == BookingStatus.confirmed,
+        )
+        .toList();
+    final cancelledBookings = bookings
+        .where((b) => b.status == BookingStatus.cancelled)
         .toList();
 
     return Scaffold(
@@ -45,6 +67,58 @@ class RepairsScreen extends ConsumerWidget {
                 ),
               ],
             ),
+            if (bookings.isNotEmpty) ...[
+              const SizedBox(height: 24),
+              const Text(
+                'MES RENDEZ-VOUS',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                  color: VoltronColors.greyText,
+                  letterSpacing: 0.5,
+                ),
+              ),
+              const SizedBox(height: 12),
+              ...needsResponse.map(
+                (b) => Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: ClientBookingCard(booking: b),
+                ),
+              ),
+              ...activeBookings.map(
+                (b) => Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: ClientBookingCard(booking: b),
+                ),
+              ),
+              if (cancelledBookings.isNotEmpty)
+                Theme(
+                  data: Theme.of(
+                    context,
+                  ).copyWith(dividerColor: Colors.transparent),
+                  child: ExpansionTile(
+                    tilePadding: EdgeInsets.zero,
+                    iconColor: VoltronColors.electricYellow,
+                    collapsedIconColor: VoltronColors.greyText,
+                    title: Text(
+                      'Rendez-vous annulés (${cancelledBookings.length})',
+                      style: const TextStyle(
+                        color: VoltronColors.greyText,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    children: cancelledBookings
+                        .map(
+                          (b) => Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: ClientBookingCard(booking: b),
+                          ),
+                        )
+                        .toList(),
+                  ),
+                ),
+            ],
             const SizedBox(height: 20),
             if (orders.isEmpty)
               const Text(
@@ -59,6 +133,36 @@ class RepairsScreen extends ConsumerWidget {
                     order: order,
                     collapsible: true,
                   ),
+                ),
+              ),
+            if (archivedOrders.isNotEmpty)
+              Theme(
+                data: Theme.of(
+                  context,
+                ).copyWith(dividerColor: Colors.transparent),
+                child: ExpansionTile(
+                  tilePadding: EdgeInsets.zero,
+                  iconColor: VoltronColors.electricYellow,
+                  collapsedIconColor: VoltronColors.greyText,
+                  title: Text(
+                    'Réparations archivées (${archivedOrders.length})',
+                    style: const TextStyle(
+                      color: VoltronColors.greyText,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  children: archivedOrders
+                      .map(
+                        (order) => Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: ClientRepairOrderDetail(
+                            order: order,
+                            collapsible: true,
+                          ),
+                        ),
+                      )
+                      .toList(),
                 ),
               ),
             const SizedBox(height: 8),

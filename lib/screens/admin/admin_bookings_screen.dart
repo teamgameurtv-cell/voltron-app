@@ -2,8 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:table_calendar/table_calendar.dart';
 import '../../models/booking.dart';
+import '../../models/client.dart';
+import '../../models/repair.dart';
+import '../../models/scooter.dart';
+import '../../providers/admin_crm_provider.dart';
 import '../../providers/bookings_provider.dart';
+import '../../providers/repair_services_provider.dart';
 import '../../theme/voltron_theme.dart';
+import '../../widgets/client_avatar.dart';
 import 'admin_shell.dart';
 
 const List<String> _weekdayLabels = [
@@ -58,6 +64,14 @@ class _AdminBookingsScreenState extends ConsumerState<AdminBookingsScreen> {
     return AdminShell(
       selected: AdminSection.bookings,
       title: 'RÉSERVATIONS',
+      actions: ElevatedButton.icon(
+        onPressed: () => showDialog(
+          context: context,
+          builder: (_) => const _CreateBookingDialog(),
+        ),
+        icon: const Icon(Icons.add, size: 18),
+        label: const Text('NOUVELLE RÉSERVATION'),
+      ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -253,11 +267,13 @@ class _StatusBadge extends StatelessWidget {
       BookingStatus.confirmed => VoltronColors.success,
       BookingStatus.pending => VoltronColors.warning,
       BookingStatus.cancelled => const Color(0xFFFF5C5C),
+      BookingStatus.rescheduled => VoltronColors.electricBlueGlow,
     };
     final label = switch (status) {
       BookingStatus.confirmed => 'Confirmé',
       BookingStatus.pending => 'En attente',
       BookingStatus.cancelled => 'Annulé',
+      BookingStatus.rescheduled => 'Reprogrammé',
     };
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
@@ -831,6 +847,523 @@ class _DetailRow extends StatelessWidget {
             child: Text(
               value,
               style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Réservation prise par l'admin au nom d'un client (téléphone, en magasin...) :
+/// on recherche d'abord le client pour bien relier le rendez-vous à son
+/// compte (il le retrouve dans son app et reçoit une notification), puis on
+/// choisit le service, un véhicule optionnel, un créneau et une description.
+class _CreateBookingDialog extends ConsumerStatefulWidget {
+  const _CreateBookingDialog();
+
+  @override
+  ConsumerState<_CreateBookingDialog> createState() =>
+      _CreateBookingDialogState();
+}
+
+class _CreateBookingDialogState extends ConsumerState<_CreateBookingDialog> {
+  final _searchController = TextEditingController();
+  final _problemController = TextEditingController();
+  String _query = '';
+  Client? _selectedClient;
+  RepairService? _selectedService;
+  OwnedScooter? _selectedScooter;
+  DateTime _focusedDay = DateTime.now();
+  DateTime? _selectedDay;
+  String? _selectedTime;
+  List<String> _bookedTimes = [];
+  bool _loadingBookedTimes = false;
+  bool _submitting = false;
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _problemController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadBookedTimes(DateTime day) async {
+    setState(() => _loadingBookedTimes = true);
+    final formatted =
+        '${day.day} ${bookingMonthNames[day.month - 1]} ${day.year}';
+    final booked = await ref
+        .read(bookingsProvider.notifier)
+        .bookedTimesForDay(formatted);
+    if (!mounted) return;
+    setState(() {
+      _bookedTimes = booked;
+      _loadingBookedTimes = false;
+    });
+  }
+
+  Future<void> _submit() async {
+    final client = _selectedClient;
+    final service = _selectedService;
+    final day = _selectedDay;
+    final time = _selectedTime;
+    if (client == null || service == null || day == null || time == null) {
+      return;
+    }
+    setState(() => _submitting = true);
+    final formatted =
+        '${day.day} ${bookingMonthNames[day.month - 1]} ${day.year}';
+    try {
+      await ref
+          .read(bookingsProvider.notifier)
+          .adminCreateBooking(
+            clientId: client.id,
+            serviceName: service.name,
+            clientName: client.fullName,
+            day: formatted,
+            time: time,
+            problemDescription: _problemController.text.trim(),
+            scooterName: _selectedScooter != null
+                ? '${_selectedScooter!.brand} ${_selectedScooter!.model}'
+                : '',
+            clientPhone: client.phone,
+          );
+      if (!mounted) return;
+      Navigator.of(context).pop();
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final client = _selectedClient;
+    return AlertDialog(
+      backgroundColor: VoltronColors.cardBlack,
+      title: Text(
+        client == null ? 'Nouvelle réservation' : 'Nouvelle réservation',
+      ),
+      content: SizedBox(
+        width: 420,
+        child: client == null ? _buildClientSearch() : _buildForm(client),
+      ),
+      actions: client == null
+          ? [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Annuler'),
+              ),
+            ]
+          : [
+              TextButton(
+                onPressed: () => setState(() {
+                  _selectedClient = null;
+                  _selectedService = null;
+                  _selectedScooter = null;
+                  _selectedDay = null;
+                  _selectedTime = null;
+                  _bookedTimes = [];
+                }),
+                child: const Text('CHANGER DE CLIENT'),
+              ),
+              ElevatedButton(
+                onPressed:
+                    (_selectedService == null ||
+                        _selectedDay == null ||
+                        _selectedTime == null ||
+                        _submitting)
+                    ? null
+                    : _submit,
+                child: _submitting
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: VoltronColors.deepBlack,
+                        ),
+                      )
+                    : const Text('CRÉER LE RENDEZ-VOUS'),
+              ),
+            ],
+    );
+  }
+
+  Widget _buildClientSearch() {
+    return SingleChildScrollView(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Recherche le client à qui relier la réservation.',
+            style: TextStyle(color: VoltronColors.greyText, fontSize: 12),
+          ),
+          const SizedBox(height: 10),
+          TextField(
+            controller: _searchController,
+            autofocus: true,
+            onChanged: (v) => setState(() => _query = v),
+            decoration: const InputDecoration(
+              hintText: 'Nom, téléphone ou email...',
+              prefixIcon: Icon(Icons.search_rounded),
+            ),
+          ),
+          const SizedBox(height: 12),
+          if (_query.trim().isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 20),
+              child: Text(
+                'Tape un nom, un numéro ou un email pour retrouver le client.',
+                style: TextStyle(color: VoltronColors.greyText, fontSize: 12),
+              ),
+            )
+          else
+            Consumer(
+              builder: (context, ref, _) {
+                final resultsAsync = ref.watch(clientSearchProvider(_query));
+                return resultsAsync.when(
+                  loading: () => const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 20),
+                    child: Center(
+                      child: CircularProgressIndicator(
+                        color: VoltronColors.electricYellow,
+                      ),
+                    ),
+                  ),
+                  error: (err, _) => Text(
+                    'Erreur : $err',
+                    style: const TextStyle(color: VoltronColors.greyText),
+                  ),
+                  data: (clients) => clients.isEmpty
+                      ? const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 20),
+                          child: Text(
+                            'Aucun client trouvé.',
+                            style: TextStyle(
+                              color: VoltronColors.greyText,
+                              fontSize: 12,
+                            ),
+                          ),
+                        )
+                      : SizedBox(
+                          height: 300,
+                          child: ListView.separated(
+                            shrinkWrap: true,
+                            itemCount: clients.length,
+                            separatorBuilder: (_, __) =>
+                                const SizedBox(height: 8),
+                            itemBuilder: (context, index) {
+                              final c = clients[index];
+                              return Material(
+                                color: VoltronColors.deepBlack,
+                                borderRadius: BorderRadius.circular(
+                                  VoltronRadii.md,
+                                ),
+                                child: InkWell(
+                                  borderRadius: BorderRadius.circular(
+                                    VoltronRadii.md,
+                                  ),
+                                  onTap: () =>
+                                      setState(() => _selectedClient = c),
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(10),
+                                    child: Row(
+                                      children: [
+                                        ClientAvatar(
+                                          avatarUrl: c.avatarUrl,
+                                          radius: 18,
+                                        ),
+                                        const SizedBox(width: 10),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                c.fullName,
+                                                style: const TextStyle(
+                                                  fontWeight: FontWeight.w700,
+                                                  fontSize: 13,
+                                                ),
+                                              ),
+                                              if (c.phone.isNotEmpty ||
+                                                  c.email.isNotEmpty)
+                                                Text(
+                                                  [c.phone, c.email]
+                                                      .where(
+                                                        (s) => s.isNotEmpty,
+                                                      )
+                                                      .join(' · '),
+                                                  style: const TextStyle(
+                                                    color:
+                                                        VoltronColors.greyText,
+                                                    fontSize: 11,
+                                                  ),
+                                                ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                );
+              },
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildForm(Client client) {
+    final services = ref.watch(repairServicesProvider);
+    final scooters =
+        ref.watch(clientScootersProvider(client.id)).valueOrNull ?? [];
+
+    return SingleChildScrollView(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: VoltronColors.deepBlack,
+              borderRadius: BorderRadius.circular(VoltronRadii.md),
+            ),
+            child: Row(
+              children: [
+                ClientAvatar(avatarUrl: client.avatarUrl, radius: 18),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        client.fullName,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13,
+                        ),
+                      ),
+                      if (client.phone.isNotEmpty)
+                        Text(
+                          client.phone,
+                          style: const TextStyle(
+                            color: VoltronColors.greyText,
+                            fontSize: 11,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'Service',
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 6),
+          DropdownButtonFormField<RepairService>(
+            value: _selectedService,
+            dropdownColor: VoltronColors.cardBlack,
+            hint: const Text('Choisir un service'),
+            items: services
+                .map((s) => DropdownMenuItem(value: s, child: Text(s.name)))
+                .toList(),
+            onChanged: (s) => setState(() => _selectedService = s),
+          ),
+          const SizedBox(height: 14),
+          const Text(
+            'Véhicule (optionnel)',
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 6),
+          DropdownButtonFormField<OwnedScooter?>(
+            value: _selectedScooter,
+            dropdownColor: VoltronColors.cardBlack,
+            hint: const Text('Aucun véhicule spécifié'),
+            items: [
+              const DropdownMenuItem<OwnedScooter?>(
+                value: null,
+                child: Text('Aucun véhicule spécifié'),
+              ),
+              ...scooters.map(
+                (s) => DropdownMenuItem<OwnedScooter?>(
+                  value: s,
+                  child: Text('${s.brand} ${s.model}'),
+                ),
+              ),
+            ],
+            onChanged: (s) => setState(() => _selectedScooter = s),
+          ),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: VoltronColors.deepBlack,
+              borderRadius: BorderRadius.circular(VoltronRadii.md),
+            ),
+            child: TableCalendar<void>(
+              firstDay: DateTime.now().subtract(const Duration(days: 1)),
+              lastDay: DateTime(DateTime.now().year + 2),
+              focusedDay: _focusedDay,
+              selectedDayPredicate: (day) =>
+                  _selectedDay != null && isSameDay(_selectedDay!, day),
+              startingDayOfWeek: StartingDayOfWeek.monday,
+              daysOfWeekHeight: 20,
+              onDaySelected: (selected, focused) {
+                setState(() {
+                  _selectedDay = selected;
+                  _focusedDay = focused;
+                  _selectedTime = null;
+                });
+                _loadBookedTimes(selected);
+              },
+              onPageChanged: (focused) => setState(() => _focusedDay = focused),
+              headerStyle: HeaderStyle(
+                titleCentered: true,
+                formatButtonVisible: false,
+                titleTextStyle: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                ),
+                leftChevronIcon: const Icon(
+                  Icons.chevron_left_rounded,
+                  size: 20,
+                ),
+                rightChevronIcon: const Icon(
+                  Icons.chevron_right_rounded,
+                  size: 20,
+                ),
+                titleTextFormatter: (date, locale) =>
+                    '${bookingMonthNames[date.month - 1]} ${date.year}',
+              ),
+              calendarBuilders: CalendarBuilders(
+                dowBuilder: (context, day) => Center(
+                  child: Text(
+                    _weekdayLabels[day.weekday - 1],
+                    style: const TextStyle(
+                      color: VoltronColors.greyText,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ),
+              calendarStyle: CalendarStyle(
+                outsideDaysVisible: false,
+                defaultTextStyle: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                ),
+                weekendTextStyle: const TextStyle(
+                  color: Colors.white70,
+                  fontSize: 12,
+                ),
+                todayDecoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: VoltronColors.electricBlueGlow,
+                    width: 1.5,
+                  ),
+                ),
+                selectedDecoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: VoltronColors.electricYellow,
+                ),
+                selectedTextStyle: const TextStyle(
+                  color: VoltronColors.deepBlack,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              const Text(
+                'Heure',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+              ),
+              if (_loadingBookedTimes) ...[
+                const SizedBox(width: 8),
+                const SizedBox(
+                  width: 12,
+                  height: 12,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: VoltronColors.electricYellow,
+                  ),
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 8),
+          if (_selectedDay == null)
+            const Text(
+              'Choisis d\'abord une date.',
+              style: TextStyle(color: VoltronColors.greyText, fontSize: 12),
+            )
+          else
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: _rescheduleTimeSlots.map((time) {
+                final isSelected = time == _selectedTime;
+                final isTaken = _bookedTimes.contains(time);
+                return GestureDetector(
+                  onTap: isTaken
+                      ? null
+                      : () => setState(() => _selectedTime = time),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? VoltronColors.electricYellow
+                          : VoltronColors.deepBlack,
+                      borderRadius: BorderRadius.circular(VoltronRadii.sm),
+                      border: isTaken
+                          ? Border.all(
+                              color: VoltronColors.greyText.withValues(
+                                alpha: 0.3,
+                              ),
+                            )
+                          : null,
+                    ),
+                    child: Text(
+                      time,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: isTaken
+                            ? VoltronColors.greyText.withValues(alpha: 0.5)
+                            : isSelected
+                            ? VoltronColors.deepBlack
+                            : Colors.white,
+                        decoration: isTaken ? TextDecoration.lineThrough : null,
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          const SizedBox(height: 14),
+          TextField(
+            controller: _problemController,
+            maxLines: 3,
+            decoration: const InputDecoration(
+              hintText: 'Description du problème (optionnel)',
             ),
           ),
         ],

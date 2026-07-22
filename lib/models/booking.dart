@@ -1,4 +1,7 @@
-enum BookingStatus { confirmed, pending, cancelled }
+/// [rescheduled] : l'admin a proposé un nouveau créneau, en attente de la
+/// réponse du client (accepter/refuser) — distinct de [pending], qui est
+/// juste une réservation pas encore traitée par l'admin.
+enum BookingStatus { confirmed, pending, cancelled, rescheduled }
 
 const List<String> bookingMonthNames = [
   'Janvier',

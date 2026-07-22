@@ -1,5 +1,6 @@
 class OwnedScooter {
   final String id;
+  final String ownerId;
   final String brand;
   final String model;
   final String serialNumber;
@@ -8,6 +9,7 @@ class OwnedScooter {
 
   const OwnedScooter({
     required this.id,
+    this.ownerId = '',
     required this.brand,
     required this.model,
     required this.serialNumber,
@@ -20,7 +22,11 @@ class OwnedScooter {
 
   /// Révision conseillée tous les 6 mois à partir de l'achat.
   DateTime get nextRevisionDate {
-    var next = DateTime(purchaseDate.year, purchaseDate.month + 6, purchaseDate.day);
+    var next = DateTime(
+      purchaseDate.year,
+      purchaseDate.month + 6,
+      purchaseDate.day,
+    );
     final now = DateTime.now();
     while (next.isBefore(now)) {
       next = DateTime(next.year, next.month + 6, next.day);
@@ -34,6 +40,7 @@ class OwnedScooter {
   factory OwnedScooter.fromMap(Map<String, dynamic> map) {
     return OwnedScooter(
       id: map['id'] as String,
+      ownerId: map['owner_id'] as String? ?? '',
       brand: map['brand'] as String,
       model: map['model'] as String,
       serialNumber: map['serial_number'] as String? ?? '',

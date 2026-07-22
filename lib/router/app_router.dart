@@ -38,6 +38,7 @@ import '../screens/admin/admin_announcements_screen.dart';
 import '../screens/admin/admin_repairs_board_screen.dart';
 import '../screens/admin/admin_services_screen.dart';
 import '../screens/admin/admin_support_screen.dart';
+import '../screens/admin/admin_vehicle_lookup_screen.dart';
 import '../screens/notifications/notifications_screen.dart';
 import '../screens/support/support_tickets_screen.dart';
 import '../screens/support/support_ticket_screen.dart';
@@ -245,6 +246,10 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: '/admin/support',
       builder: (context, state) => const AdminSupportScreen(),
+    ),
+    GoRoute(
+      path: '/admin/vehicle-lookup',
+      builder: (context, state) => const AdminVehicleLookupScreen(),
     ),
     GoRoute(
       path: '/support',

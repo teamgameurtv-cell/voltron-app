@@ -92,8 +92,9 @@ class BookingsNotifier extends StateNotifier<List<Booking>> {
         );
   }
 
-  /// Propose un nouveau créneau au client (repasse en attente le temps que ce
-  /// soit validé) et le prévient, avec la raison si elle est renseignée.
+  /// Propose un nouveau créneau au client (statut 'rescheduled', distinct de
+  /// 'pending', pour qu'il sache clairement qu'une réponse de sa part est
+  /// attendue) et le prévient, avec la raison si elle est renseignée.
   Future<void> rescheduleBooking(
     String id, {
     required String day,
@@ -103,7 +104,7 @@ class BookingsNotifier extends StateNotifier<List<Booking>> {
     final booking = state.firstWhere((b) => b.id == id);
     await _client
         .from('bookings')
-        .update({'day': day, 'time': time, 'status': 'pending'})
+        .update({'day': day, 'time': time, 'status': 'rescheduled'})
         .eq('id', id);
     if (booking.clientId == null) return;
     final reasonText = (reason != null && reason.trim().isNotEmpty)
@@ -116,8 +117,65 @@ class BookingsNotifier extends StateNotifier<List<Booking>> {
           type: NotificationType.order,
           title: 'Nouveau créneau proposé',
           body:
-              'Ton rendez-vous (${booking.serviceName}) est proposé pour le $day à $time.$reasonText',
+              'Ton rendez-vous (${booking.serviceName}) est proposé pour le $day à $time.$reasonText '
+              'Ouvre l\'app pour accepter ou refuser.',
         );
+  }
+
+  /// Crée une réservation au nom d'un client précis (prise par téléphone, en
+  /// magasin...) — contrairement à [add], qui réserve toujours pour
+  /// l'utilisateur courant, ceci vise explicitement [clientId]. Le statut est
+  /// directement 'confirmed' car c'est l'admin qui fixe lui-même le rendez-vous.
+  Future<void> adminCreateBooking({
+    required String clientId,
+    required String serviceName,
+    required String clientName,
+    required String day,
+    required String time,
+    String problemDescription = '',
+    String scooterName = '',
+    String clientPhone = '',
+  }) async {
+    await _client.from('bookings').insert({
+      'client_id': clientId,
+      'service_name': serviceName,
+      'client_name': clientName,
+      'day': day,
+      'time': time,
+      'status': 'confirmed',
+      'problem_description': problemDescription,
+      'scooter_name': scooterName,
+      'client_phone': clientPhone,
+    });
+    await ref
+        .read(notificationsProvider.notifier)
+        .notifyClient(
+          clientId,
+          type: NotificationType.order,
+          title: 'Nouveau rendez-vous',
+          body:
+              'Un rendez-vous ($serviceName) a été pris pour toi le $day à $time.',
+        );
+  }
+
+  /// Le client accepte ou refuse un créneau reprogrammé par l'admin — la
+  /// fonction côté serveur vérifie que c'est bien sa réservation et qu'elle
+  /// est bien en attente de réponse avant d'appliquer le changement.
+  Future<void> respondToReschedule(String id, bool accept) async {
+    await _client.rpc(
+      'client_respond_to_reschedule',
+      params: {'p_booking_id': id, 'p_accept': accept},
+    );
+  }
+
+  /// Le client complète/corrige la description de son problème après coup —
+  /// utile si la réservation a été prise par téléphone par l'admin sans
+  /// détail précis (celui-ci pourra toujours en discuter en boutique).
+  Future<void> updateProblemDescription(String id, String description) async {
+    await _client.rpc(
+      'client_update_booking_problem',
+      params: {'p_booking_id': id, 'p_description': description},
+    );
   }
 
   @override

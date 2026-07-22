@@ -163,11 +163,13 @@ class _BookingRow extends StatelessWidget {
       BookingStatus.confirmed => VoltronColors.success,
       BookingStatus.pending => VoltronColors.warning,
       BookingStatus.cancelled => const Color(0xFFFF5C5C),
+      BookingStatus.rescheduled => VoltronColors.electricBlueGlow,
     };
     final statusLabel = switch (booking.status) {
       BookingStatus.confirmed => 'Confirmé',
       BookingStatus.pending => 'En attente',
       BookingStatus.cancelled => 'Annulé',
+      BookingStatus.rescheduled => 'Reprogrammé',
     };
 
     return Padding(

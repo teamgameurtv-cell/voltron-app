@@ -128,6 +128,7 @@ class LoyaltyScreen extends ConsumerWidget {
     final loyaltyPoints = ref.watch(profileProvider).loyaltyPoints;
     final claimedGoals =
         ref.watch(claimedLoyaltyGoalsProvider).valueOrNull ?? {};
+    final redemptions = ref.watch(myRedemptionsProvider).valueOrNull ?? [];
 
     for (final goal in _loyaltyGoals) {
       if (!goal.manual &&
@@ -572,6 +573,109 @@ class LoyaltyScreen extends ConsumerWidget {
                 }).toList(),
               ),
             ),
+            if (redemptions.isNotEmpty) ...[
+              const SizedBox(height: 24),
+              const Text(
+                'MES CODES ÉCHANGÉS',
+                style: TextStyle(
+                  fontSize: 12,
+                  letterSpacing: 1,
+                  fontWeight: FontWeight.w700,
+                  color: VoltronColors.greyText,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Theme(
+                data: Theme.of(
+                  context,
+                ).copyWith(dividerColor: Colors.transparent),
+                child: ExpansionTile(
+                  tilePadding: EdgeInsets.zero,
+                  childrenPadding: const EdgeInsets.only(top: 8),
+                  shape: const Border(),
+                  collapsedShape: const Border(),
+                  iconColor: VoltronColors.electricYellow,
+                  collapsedIconColor: VoltronColors.greyText,
+                  title: Text(
+                    'Voir mes codes (${redemptions.length})',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: VoltronColors.greyText,
+                    ),
+                  ),
+                  children: redemptions
+                      .map(
+                        (r) => GestureDetector(
+                          onTap: () => _showRedemptionDialog(context, r),
+                          child: Container(
+                            margin: const EdgeInsets.only(bottom: 10),
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: VoltronColors.cardBlack,
+                              borderRadius: BorderRadius.circular(
+                                VoltronRadii.md,
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        r.rewardLabel,
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 13,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        '${r.redeemedAt.toLocal().day.toString().padLeft(2, '0')}/${r.redeemedAt.toLocal().month.toString().padLeft(2, '0')}/${r.redeemedAt.toLocal().year}',
+                                        style: const TextStyle(
+                                          color: VoltronColors.greyText,
+                                          fontSize: 11,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 6,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: VoltronColors.deepBlack,
+                                    borderRadius: BorderRadius.circular(
+                                      VoltronRadii.sm,
+                                    ),
+                                    border: Border.all(
+                                      color: VoltronColors.electricYellow
+                                          .withValues(alpha: 0.5),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    r.code,
+                                    style: const TextStyle(
+                                      color: VoltronColors.electricYellow,
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: 2,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      )
+                      .toList(),
+                ),
+              ),
+            ],
             const SizedBox(height: 20),
             Container(
               padding: const EdgeInsets.all(16),
@@ -627,97 +731,79 @@ class LoyaltyScreen extends ConsumerWidget {
           width: 360,
           child: Consumer(
             builder: (context, ref, _) {
-              final historyAsync = ref.watch(loyaltyHistoryProvider);
-              return historyAsync.when(
-                loading: () => const Padding(
+              final entries = ref.watch(loyaltyHistoryProvider);
+              if (entries.isEmpty) {
+                return const Padding(
                   padding: EdgeInsets.symmetric(vertical: 20),
-                  child: Center(
-                    child: CircularProgressIndicator(
-                      color: VoltronColors.electricYellow,
+                  child: Text(
+                    'Aucun historique pour l\'instant. Complète des objectifs fidélité pour gagner tes premiers points !',
+                    style: TextStyle(
+                      color: VoltronColors.greyText,
+                      fontSize: 13,
                     ),
                   ),
-                ),
-                error: (err, _) => Text(
-                  'Erreur : $err',
-                  style: const TextStyle(color: VoltronColors.greyText),
-                ),
-                data: (rows) {
-                  if (rows.isEmpty) {
-                    return const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 20),
-                      child: Text(
-                        'Aucun historique pour l\'instant. Complète des objectifs fidélité pour gagner tes premiers points !',
-                        style: TextStyle(
-                          color: VoltronColors.greyText,
-                          fontSize: 13,
-                        ),
+                );
+              }
+              return SizedBox(
+                height: 320,
+                child: ListView.separated(
+                  itemCount: entries.length,
+                  separatorBuilder: (_, __) =>
+                      const Divider(color: Colors.white24, height: 1),
+                  itemBuilder: (context, index) {
+                    final entry = entries[index];
+                    final title = entry.isGoal
+                        ? _loyaltyGoals
+                              .firstWhere(
+                                (g) => g.id == entry.label,
+                                orElse: () => _LoyaltyGoal(
+                                  id: entry.label,
+                                  title: entry.label,
+                                  subtitle: '',
+                                  points: 0,
+                                  icon: Icons.star,
+                                ),
+                              )
+                              .title
+                        : entry.label;
+                    final date = entry.date.toLocal();
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  title,
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                Text(
+                                  '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}',
+                                  style: const TextStyle(
+                                    color: VoltronColors.greyText,
+                                    fontSize: 11,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Text(
+                            '+${entry.points} pts',
+                            style: const TextStyle(
+                              color: VoltronColors.electricYellow,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
                       ),
                     );
-                  }
-                  return SizedBox(
-                    height: 320,
-                    child: ListView.separated(
-                      itemCount: rows.length,
-                      separatorBuilder: (_, __) =>
-                          const Divider(color: Colors.white24, height: 1),
-                      itemBuilder: (context, index) {
-                        final row = rows[index];
-                        final goalId = row['goal_id'] as String;
-                        final title = _loyaltyGoals
-                            .firstWhere(
-                              (g) => g.id == goalId,
-                              orElse: () => _LoyaltyGoal(
-                                id: goalId,
-                                title: goalId,
-                                subtitle: '',
-                                points: 0,
-                                icon: Icons.star,
-                              ),
-                            )
-                            .title;
-                        final date = DateTime.tryParse(
-                          row['claimed_at'] as String,
-                        )?.toLocal();
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 10),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      title,
-                                      style: const TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                    if (date != null)
-                                      Text(
-                                        '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}',
-                                        style: const TextStyle(
-                                          color: VoltronColors.greyText,
-                                          fontSize: 11,
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                              ),
-                              Text(
-                                '+${row['points']} pts',
-                                style: const TextStyle(
-                                  color: VoltronColors.electricYellow,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                    ),
-                  );
-                },
+                  },
+                ),
               );
             },
           ),

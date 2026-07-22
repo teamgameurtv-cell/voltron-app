@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../models/booking.dart';
 import '../../models/repair.dart';
 import '../../models/reward.dart';
 import '../../models/shortcut_option.dart';
 import '../../providers/account_provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/bookings_provider.dart';
 import '../../providers/promo_banner_provider.dart';
 import '../../providers/repairs_provider.dart';
 import '../../providers/rewards_provider.dart';
@@ -28,6 +30,7 @@ class AccueilScreen extends ConsumerWidget {
         .where((o) => o.clientId == userId && !o.isComplete)
         .toList();
     final activeOrder = myActiveOrders.isEmpty ? null : myActiveOrders.first;
+    final nextBooking = _nextBooking(ref, userId);
     return Scaffold(
       backgroundColor: VoltronColors.deepBlack,
       body: SafeArea(
@@ -40,6 +43,10 @@ class AccueilScreen extends ConsumerWidget {
             if (activePlan != null) ...[
               const SizedBox(height: 16),
               _buildCareStatus(context, activePlan.name),
+            ],
+            if (nextBooking != null) ...[
+              const SizedBox(height: 16),
+              _buildNextBooking(context, nextBooking),
             ],
             if (activeOrder != null) ...[
               const SizedBox(height: 16),
@@ -234,6 +241,126 @@ class AccueilScreen extends ConsumerWidget {
                 Icons.bolt_rounded,
                 color: VoltronColors.electricYellow,
                 size: 40,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Prochain rendez-vous actif (hors annulés) à mettre en avant sur
+  /// l'accueil : une réservation en attente de réponse à une reprogrammation
+  /// passe avant toute autre, car elle demande une action du client.
+  Booking? _nextBooking(WidgetRef ref, String? userId) {
+    final bookings =
+        ref
+            .watch(bookingsProvider)
+            .where(
+              (b) =>
+                  b.clientId == userId && b.status != BookingStatus.cancelled,
+            )
+            .toList()
+          ..sort((a, b) {
+            final aNeedsResponse = a.status == BookingStatus.rescheduled;
+            final bNeedsResponse = b.status == BookingStatus.rescheduled;
+            if (aNeedsResponse != bNeedsResponse) {
+              return aNeedsResponse ? -1 : 1;
+            }
+            final da = a.parsedDay;
+            final db = b.parsedDay;
+            if (da == null || db == null) return 0;
+            return da.compareTo(db);
+          });
+    return bookings.isEmpty ? null : bookings.first;
+  }
+
+  Widget _buildNextBooking(BuildContext context, Booking booking) {
+    final needsResponse = booking.status == BookingStatus.rescheduled;
+    final statusColor = switch (booking.status) {
+      BookingStatus.confirmed => VoltronColors.success,
+      BookingStatus.pending => VoltronColors.warning,
+      BookingStatus.rescheduled => VoltronColors.electricBlueGlow,
+      BookingStatus.cancelled => VoltronColors.greyText,
+    };
+    final statusLabel = switch (booking.status) {
+      BookingStatus.confirmed => 'Confirmé',
+      BookingStatus.pending => 'En attente',
+      BookingStatus.rescheduled => 'Nouveau créneau à confirmer',
+      BookingStatus.cancelled => 'Annulé',
+    };
+    return Card(
+      child: InkWell(
+        borderRadius: BorderRadius.circular(VoltronRadii.md),
+        onTap: () => context.go('/repairs'),
+        child: Container(
+          decoration: needsResponse
+              ? BoxDecoration(
+                  borderRadius: BorderRadius.circular(VoltronRadii.md),
+                  border: Border.all(
+                    color: VoltronColors.electricBlueGlow.withValues(
+                      alpha: 0.6,
+                    ),
+                  ),
+                )
+              : null,
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  color: VoltronColors.deepBlack,
+                  borderRadius: BorderRadius.circular(VoltronRadii.sm),
+                ),
+                child: const Icon(
+                  Icons.event_rounded,
+                  color: VoltronColors.electricYellow,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      booking.serviceName,
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    Text(
+                      '${booking.day} à ${booking.time}',
+                      style: const TextStyle(
+                        color: VoltronColors.greyText,
+                        fontSize: 12,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Container(
+                          width: 7,
+                          height: 7,
+                          decoration: BoxDecoration(
+                            color: statusColor,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            statusLabel,
+                            style: TextStyle(color: statusColor, fontSize: 12),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(
+                Icons.chevron_right_rounded,
+                color: VoltronColors.greyText,
               ),
             ],
           ),

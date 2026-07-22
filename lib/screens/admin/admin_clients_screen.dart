@@ -113,53 +113,11 @@ class _AdminClientsScreenState extends ConsumerState<AdminClientsScreen> {
                       separatorBuilder: (_, __) => const SizedBox(height: 8),
                       itemBuilder: (context, index) {
                         final client = results[index];
-                        final isSelected = client.id == _selectedClientId;
-                        return Material(
-                          color: isSelected
-                              ? VoltronColors.cardBlack
-                              : Colors.transparent,
-                          borderRadius: BorderRadius.circular(VoltronRadii.md),
-                          child: InkWell(
-                            borderRadius: BorderRadius.circular(
-                              VoltronRadii.md,
-                            ),
-                            onTap: () =>
-                                setState(() => _selectedClientId = client.id),
-                            child: Padding(
-                              padding: const EdgeInsets.all(12),
-                              child: Row(
-                                children: [
-                                  ClientAvatar(
-                                    avatarUrl: client.avatarUrl,
-                                    radius: 16,
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          client.fullName,
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.w600,
-                                            fontSize: 13,
-                                          ),
-                                        ),
-                                        Text(
-                                          client.email,
-                                          style: const TextStyle(
-                                            color: VoltronColors.greyText,
-                                            fontSize: 11,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
+                        return _ClientResultTile(
+                          client: client,
+                          isSelected: client.id == _selectedClientId,
+                          onTap: () =>
+                              setState(() => _selectedClientId = client.id),
                         );
                       },
                     ),
@@ -183,6 +141,73 @@ class _AdminClientsScreenState extends ConsumerState<AdminClientsScreen> {
                   ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _ClientResultTile extends ConsumerWidget {
+  final Client client;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _ClientResultTile({
+    required this.client,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final plan = ref.watch(clientSubscriptionProvider(client.id)).valueOrNull;
+
+    return Material(
+      color: isSelected ? VoltronColors.cardBlack : Colors.transparent,
+      borderRadius: BorderRadius.circular(VoltronRadii.md),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(VoltronRadii.md),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            children: [
+              ClientAvatar(avatarUrl: client.avatarUrl, radius: 16),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            client.fullName,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
+                        if (plan != null) ...[
+                          const SizedBox(width: 6),
+                          CareBadge(plan: plan),
+                        ],
+                      ],
+                    ),
+                    Text(
+                      client.email,
+                      style: const TextStyle(
+                        color: VoltronColors.greyText,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -823,91 +848,118 @@ class _ClientDetail extends ConsumerWidget {
     WidgetRef ref,
     Client client,
   ) {
-    final firstNameController = TextEditingController(text: client.firstName);
-    final nameController = TextEditingController(text: client.name);
-    final emailController = TextEditingController(text: client.email);
-    final phoneController = TextEditingController(text: client.phone);
-    DateTime? dateOfBirth = client.dateOfBirth;
-
     showDialog(
       context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (dialogContext, setDialogState) => AlertDialog(
-          backgroundColor: VoltronColors.cardBlack,
-          title: const Text('Modifier le client'),
-          content: SizedBox(
-            width: 360,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: firstNameController,
-                  decoration: const InputDecoration(hintText: 'Prénom'),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: nameController,
-                  decoration: const InputDecoration(hintText: 'Nom'),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: emailController,
-                  decoration: const InputDecoration(hintText: 'E-mail'),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: phoneController,
-                  decoration: const InputDecoration(hintText: 'Téléphone'),
-                ),
-                const SizedBox(height: 12),
-                InkWell(
-                  onTap: () async {
-                    final picked = await showDatePicker(
-                      context: dialogContext,
-                      initialDate: dateOfBirth ?? DateTime(2000, 1, 1),
-                      firstDate: DateTime(1920),
-                      lastDate: DateTime.now(),
-                    );
-                    if (picked != null) {
-                      setDialogState(() => dateOfBirth = picked);
-                    }
-                  },
-                  child: InputDecorator(
-                    decoration: const InputDecoration(
-                      hintText: 'Date de naissance',
+      builder: (dialogContext) => Dialog(
+        backgroundColor: VoltronColors.cardBlack,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 400),
+          child: Consumer(
+            builder: (context, ref, _) {
+              final c =
+                  ref.watch(clientByIdProvider(client.id)).valueOrNull ??
+                  client;
+              return Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Expanded(
+                          child: Text(
+                            'Modifier le client',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: () => Navigator.of(dialogContext).pop(),
+                          icon: const Icon(Icons.close_rounded, size: 20),
+                        ),
+                      ],
                     ),
-                    child: Text(
-                      dateOfBirth != null
-                          ? '${dateOfBirth!.day.toString().padLeft(2, '0')}/${dateOfBirth!.month.toString().padLeft(2, '0')}/${dateOfBirth!.year}'
-                          : 'Non renseignée',
+                    const SizedBox(height: 4),
+                    _InfoRow(
+                      icon: Icons.badge_outlined,
+                      label: 'Prénom',
+                      value: c.firstName,
+                      onEdit: () => _showEditFieldDialog(
+                        context,
+                        title: 'Prénom',
+                        initialValue: c.firstName,
+                        onSave: (value) => ref
+                            .read(adminCrmActionsProvider)
+                            .updateClientProfile(c.id, firstName: value),
+                      ),
                     ),
-                  ),
+                    _InfoRow(
+                      icon: Icons.badge_outlined,
+                      label: 'Nom',
+                      value: c.name,
+                      onEdit: () => _showEditFieldDialog(
+                        context,
+                        title: 'Nom',
+                        initialValue: c.name,
+                        onSave: (value) => ref
+                            .read(adminCrmActionsProvider)
+                            .updateClientProfile(c.id, name: value),
+                      ),
+                    ),
+                    _InfoRow(
+                      icon: Icons.mail_outline,
+                      label: 'E-mail',
+                      value: c.email,
+                      onEdit: () => _showEditFieldDialog(
+                        context,
+                        title: 'E-mail',
+                        initialValue: c.email,
+                        onSave: (value) => ref
+                            .read(adminCrmActionsProvider)
+                            .updateClientProfile(c.id, email: value),
+                      ),
+                    ),
+                    _InfoRow(
+                      icon: Icons.phone_outlined,
+                      label: 'Téléphone',
+                      value: c.phone,
+                      onEdit: () => _showEditFieldDialog(
+                        context,
+                        title: 'Téléphone',
+                        initialValue: c.phone,
+                        onSave: (value) => ref
+                            .read(adminCrmActionsProvider)
+                            .updateClientProfile(c.id, phone: value),
+                      ),
+                    ),
+                    _InfoRow(
+                      icon: Icons.cake_outlined,
+                      label: 'Naissance',
+                      value: c.dateOfBirth != null
+                          ? _formatFrenchDate(c.dateOfBirth!)
+                          : '',
+                      onEdit: () async {
+                        final picked = await showDatePicker(
+                          context: context,
+                          initialDate: c.dateOfBirth ?? DateTime(2000, 1, 1),
+                          firstDate: DateTime(1920),
+                          lastDate: DateTime.now(),
+                        );
+                        if (picked != null) {
+                          await ref
+                              .read(adminCrmActionsProvider)
+                              .updateClientProfile(c.id, dateOfBirth: picked);
+                        }
+                      },
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              );
+            },
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text('Annuler'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                ref
-                    .read(adminCrmActionsProvider)
-                    .updateClientProfile(
-                      client.id,
-                      name: nameController.text.trim(),
-                      firstName: firstNameController.text.trim(),
-                      email: emailController.text.trim(),
-                      phone: phoneController.text.trim(),
-                      dateOfBirth: dateOfBirth,
-                    );
-                Navigator.of(dialogContext).pop();
-              },
-              child: const Text('ENREGISTRER'),
-            ),
-          ],
         ),
       ),
     );
@@ -1050,7 +1102,7 @@ class _ClientDetail extends ConsumerWidget {
                                 color: VoltronColors.greyText,
                               ),
                             ),
-                            _VehicleInfoRow(
+                            _InfoRow(
                               icon: Icons.local_offer_outlined,
                               label: 'Marque',
                               value: v.brand,
@@ -1063,7 +1115,7 @@ class _ClientDetail extends ConsumerWidget {
                                     .updateScooter(v.id, brand: value),
                               ),
                             ),
-                            _VehicleInfoRow(
+                            _InfoRow(
                               icon: Icons.electric_scooter_rounded,
                               label: 'Modèle',
                               value: v.model,
@@ -1076,7 +1128,7 @@ class _ClientDetail extends ConsumerWidget {
                                     .updateScooter(v.id, model: value),
                               ),
                             ),
-                            _VehicleInfoRow(
+                            _InfoRow(
                               icon: Icons.pin_outlined,
                               label: 'N° de série',
                               value: v.serialNumber,
@@ -1089,7 +1141,7 @@ class _ClientDetail extends ConsumerWidget {
                                     .updateScooter(v.id, serialNumber: value),
                               ),
                             ),
-                            _VehicleInfoRow(
+                            _InfoRow(
                               icon: Icons.event_outlined,
                               label: 'Achat le',
                               value: v.formattedPurchaseDate,
@@ -1358,67 +1410,194 @@ class _ClientDetail extends ConsumerWidget {
     final serialController = TextEditingController(
       text: existing?.serialNumber ?? '',
     );
+    DateTime selectedDate = existing?.purchaseDate ?? DateTime.now();
+    String? existingImageUrl = existing?.imageUrl;
+    String? pickedFileName;
+    Uint8List? pickedFileBytes;
+    bool saving = false;
 
     showDialog(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        backgroundColor: VoltronColors.cardBlack,
-        title: Text(
-          existing == null ? 'Nouveau véhicule' : 'Modifier le véhicule',
-        ),
-        content: SizedBox(
-          width: 360,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: brandController,
-                decoration: const InputDecoration(hintText: 'Marque'),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: modelController,
-                decoration: const InputDecoration(hintText: 'Modèle'),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: serialController,
-                decoration: const InputDecoration(hintText: 'Numéro de série'),
-              ),
-            ],
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          backgroundColor: VoltronColors.cardBlack,
+          title: Text(
+            existing == null ? 'Nouveau véhicule' : 'Modifier le véhicule',
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('Annuler'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              if (existing == null) {
-                ref
-                    .read(adminCrmActionsProvider)
-                    .addScooter(
-                      clientId,
-                      brand: brandController.text.trim(),
-                      model: modelController.text.trim(),
-                      serialNumber: serialController.text.trim(),
+          content: SizedBox(
+            width: 360,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Center(
+                  child: Stack(
+                    children: [
+                      Container(
+                        width: 88,
+                        height: 88,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: VoltronColors.deepBlack,
+                          borderRadius: BorderRadius.circular(VoltronRadii.md),
+                        ),
+                        child: pickedFileBytes != null
+                            ? ClipRRect(
+                                borderRadius: BorderRadius.circular(
+                                  VoltronRadii.md,
+                                ),
+                                child: Image.memory(
+                                  pickedFileBytes!,
+                                  width: 88,
+                                  height: 88,
+                                  fit: BoxFit.cover,
+                                ),
+                              )
+                            : (existingImageUrl != null &&
+                                  existingImageUrl.isNotEmpty)
+                            ? ClipRRect(
+                                borderRadius: BorderRadius.circular(
+                                  VoltronRadii.md,
+                                ),
+                                child: Image.network(
+                                  existingImageUrl,
+                                  width: 88,
+                                  height: 88,
+                                  fit: BoxFit.cover,
+                                ),
+                              )
+                            : const Icon(
+                                Icons.electric_scooter_rounded,
+                                color: VoltronColors.electricYellow,
+                                size: 34,
+                              ),
+                      ),
+                      Positioned(
+                        right: 0,
+                        bottom: 0,
+                        child: GestureDetector(
+                          onTap: () async {
+                            final result = await FilePicker.platform.pickFiles(
+                              type: FileType.image,
+                              withData: true,
+                            );
+                            final file = result?.files.firstOrNull;
+                            if (file?.bytes == null) return;
+                            setDialogState(() {
+                              pickedFileBytes = file!.bytes;
+                              pickedFileName = file.name;
+                            });
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.all(5),
+                            decoration: const BoxDecoration(
+                              color: VoltronColors.electricYellow,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.camera_alt_rounded,
+                              size: 13,
+                              color: VoltronColors.deepBlack,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: brandController,
+                  decoration: const InputDecoration(hintText: 'Marque'),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: modelController,
+                  decoration: const InputDecoration(hintText: 'Modèle'),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: serialController,
+                  decoration: const InputDecoration(
+                    hintText: 'Numéro de série',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                InkWell(
+                  onTap: () async {
+                    final picked = await showDatePicker(
+                      context: dialogContext,
+                      initialDate: selectedDate,
+                      firstDate: DateTime(2015),
+                      lastDate: DateTime.now(),
                     );
-              } else {
-                ref
-                    .read(adminCrmActionsProvider)
-                    .updateScooter(
-                      existing.id,
-                      brand: brandController.text.trim(),
-                      model: modelController.text.trim(),
-                      serialNumber: serialController.text.trim(),
-                    );
-              }
-              Navigator.of(dialogContext).pop();
-            },
-            child: const Text('ENREGISTRER'),
+                    if (picked != null) {
+                      setDialogState(() => selectedDate = picked);
+                    }
+                  },
+                  child: InputDecorator(
+                    decoration: const InputDecoration(
+                      hintText: 'Date d\'achat',
+                    ),
+                    child: Text(_formatFrenchDate(selectedDate)),
+                  ),
+                ),
+              ],
+            ),
           ),
-        ],
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Annuler'),
+            ),
+            ElevatedButton(
+              onPressed: saving
+                  ? null
+                  : () async {
+                      setDialogState(() => saving = true);
+                      final actions = ref.read(adminCrmActionsProvider);
+                      String scooterId;
+                      if (existing == null) {
+                        scooterId = await actions.addScooter(
+                          clientId,
+                          brand: brandController.text.trim(),
+                          model: modelController.text.trim(),
+                          serialNumber: serialController.text.trim(),
+                          purchaseDate: selectedDate,
+                        );
+                      } else {
+                        scooterId = existing.id;
+                        await actions.updateScooter(
+                          scooterId,
+                          brand: brandController.text.trim(),
+                          model: modelController.text.trim(),
+                          serialNumber: serialController.text.trim(),
+                          purchaseDate: selectedDate,
+                        );
+                      }
+                      if (pickedFileBytes != null && pickedFileName != null) {
+                        final ext = pickedFileName!.split('.').last;
+                        await actions.updateScooterImage(
+                          scooterId,
+                          pickedFileBytes!,
+                          ext,
+                        );
+                      }
+                      if (!dialogContext.mounted) return;
+                      Navigator.of(dialogContext).pop();
+                    },
+              child: saving
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: VoltronColors.deepBlack,
+                      ),
+                    )
+                  : const Text('ENREGISTRER'),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1435,11 +1614,13 @@ class _BookingSummaryTile extends StatelessWidget {
       BookingStatus.confirmed => VoltronColors.success,
       BookingStatus.pending => VoltronColors.warning,
       BookingStatus.cancelled => const Color(0xFFFF5C5C),
+      BookingStatus.rescheduled => VoltronColors.electricBlueGlow,
     };
     final statusLabel = switch (booking.status) {
       BookingStatus.confirmed => 'Confirmé',
       BookingStatus.pending => 'En attente',
       BookingStatus.cancelled => 'Annulé',
+      BookingStatus.rescheduled => 'Reprogrammé',
     };
 
     return Container(
@@ -1516,13 +1697,13 @@ class _BookingSummaryTile extends StatelessWidget {
   }
 }
 
-class _VehicleInfoRow extends StatelessWidget {
+class _InfoRow extends StatelessWidget {
   final IconData icon;
   final String label;
   final String value;
   final VoidCallback onEdit;
 
-  const _VehicleInfoRow({
+  const _InfoRow({
     required this.icon,
     required this.label,
     required this.value,

@@ -54,6 +54,23 @@ final clientScootersProvider =
           .map((rows) => rows.map(OwnedScooter.fromMap).toList());
     });
 
+/// Recherche un véhicule par numéro de série, tous propriétaires confondus —
+/// utile pour retrouver le propriétaire d'une trottinette volée/retrouvée.
+final vehicleSerialSearchProvider =
+    FutureProvider.family<List<OwnedScooter>, String>((ref, query) async {
+      final q = query.trim();
+      if (q.isEmpty) return [];
+      final rows = await ref
+          .watch(supabaseProvider)
+          .from('scooters')
+          .select()
+          .ilike('serial_number', '%$q%')
+          .limit(30);
+      return (rows as List)
+          .map((row) => OwnedScooter.fromMap(row as Map<String, dynamic>))
+          .toList();
+    });
+
 final _invoicesChangedProvider = StreamProvider<void>((ref) {
   return ref
       .watch(supabaseProvider)
@@ -135,18 +152,26 @@ class AdminCrmActions {
         .eq('id', clientId);
   }
 
-  Future<void> addScooter(
+  Future<String> addScooter(
     String clientId, {
     required String brand,
     required String model,
     required String serialNumber,
+    DateTime? purchaseDate,
   }) async {
-    await _client.from('scooters').insert({
-      'owner_id': clientId,
-      'brand': brand,
-      'model': model,
-      'serial_number': serialNumber,
-    });
+    final row = await _client
+        .from('scooters')
+        .insert({
+          'owner_id': clientId,
+          'brand': brand,
+          'model': model,
+          'serial_number': serialNumber,
+          if (purchaseDate != null)
+            'purchase_date': purchaseDate.toIso8601String().split('T').first,
+        })
+        .select()
+        .single();
+    return row['id'] as String;
   }
 
   /// Chaque champ est optionnel pour permettre une édition ciblée (un seul

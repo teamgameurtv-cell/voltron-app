@@ -888,6 +888,75 @@ grant execute on function admin_delete_invoice(uuid) to authenticated;
 -- validée, pour ne plus encombrer la liste/le kanban actifs.
 alter table repair_orders add column if not exists archived boolean not null default false;
 
+-- ============ RÉPONSE DU CLIENT À UNE REPROGRAMMATION ============
+-- Quand l'admin reprogramme un rendez-vous, le statut passe à 'rescheduled'
+-- (distinct de 'pending') pour que le client voie clairement qu'un nouveau
+-- créneau lui est proposé et doit y répondre, plutôt que de se perdre parmi
+-- les réservations simplement en attente de premier traitement.
+alter table bookings drop constraint if exists bookings_status_check;
+alter table bookings add constraint bookings_status_check
+  check (status in ('confirmed', 'pending', 'cancelled', 'rescheduled'));
+
+-- Le client ne peut pas modifier le statut de sa réservation directement
+-- (réservé à l'admin par bookings_update_admin) : cette fonction lui permet
+-- seulement d'accepter ou refuser un créneau reprogrammé qui lui est propre,
+-- jamais de toucher à une réservation dans un autre état.
+create or replace function client_respond_to_reschedule(p_booking_id uuid, p_accept boolean)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_client_id uuid;
+  v_status text;
+begin
+  select client_id, status into v_client_id, v_status from bookings where id = p_booking_id;
+  if v_client_id is null then
+    raise exception 'Réservation introuvable';
+  end if;
+  if v_client_id != auth.uid() then
+    raise exception 'Non autorisé';
+  end if;
+  if v_status != 'rescheduled' then
+    raise exception 'Cette réservation n''attend pas de réponse';
+  end if;
+
+  update bookings set status = (case when p_accept then 'confirmed' else 'cancelled' end)
+  where id = p_booking_id;
+end;
+$$;
+
+grant execute on function client_respond_to_reschedule(uuid, boolean) to authenticated;
+
+-- Le client peut compléter/corriger la description de son problème après
+-- coup (utile quand la réservation a été prise par téléphone par l'admin,
+-- sans détail précis) — mais uniquement sur sa propre réservation et sans
+-- pouvoir toucher au reste (statut, créneau...), d'où une fonction dédiée
+-- plutôt qu'une policy update ouverte.
+create or replace function client_update_booking_problem(p_booking_id uuid, p_description text)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_client_id uuid;
+begin
+  select client_id into v_client_id from bookings where id = p_booking_id;
+  if v_client_id is null then
+    raise exception 'Réservation introuvable';
+  end if;
+  if v_client_id != auth.uid() then
+    raise exception 'Non autorisé';
+  end if;
+
+  update bookings set problem_description = p_description where id = p_booking_id;
+end;
+$$;
+
+grant execute on function client_update_booking_problem(uuid, text) to authenticated;
+
 -- ============ TEMPS RÉEL ============
 -- Sans ça, l'app ne reçoit jamais les mises à jour en direct : il faut
 -- explicitement ajouter chaque table à la publication "supabase_realtime"

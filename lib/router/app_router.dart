@@ -39,6 +39,10 @@ import '../screens/admin/admin_repairs_board_screen.dart';
 import '../screens/admin/admin_services_screen.dart';
 import '../screens/admin/admin_support_screen.dart';
 import '../screens/admin/admin_vehicle_lookup_screen.dart';
+import '../screens/admin/admin_technicians_screen.dart';
+import '../screens/admin/admin_repair_order_screen.dart';
+import '../screens/repairs/repair_order_messages_screen.dart';
+import '../models/repair_order_message.dart';
 import '../screens/notifications/notifications_screen.dart';
 import '../screens/support/support_tickets_screen.dart';
 import '../screens/support/support_ticket_screen.dart';
@@ -106,6 +110,14 @@ final GoRouter appRouter = GoRouter(
                   parentNavigatorKey: rootNavigatorKey,
                   builder: (context, state) =>
                       QuoteScreen(orderId: state.pathParameters['orderId']!),
+                ),
+                GoRoute(
+                  path: 'messages/:orderId',
+                  parentNavigatorKey: rootNavigatorKey,
+                  builder: (context, state) => RepairOrderMessagesScreen(
+                    orderId: state.pathParameters['orderId']!,
+                    myRole: RepairMessageSenderRole.client,
+                  ),
                 ),
               ],
             ),
@@ -224,7 +236,9 @@ final GoRouter appRouter = GoRouter(
     ),
     GoRoute(
       path: '/admin/clients',
-      builder: (context, state) => const AdminClientsScreen(),
+      builder: (context, state) => AdminClientsScreen(
+        initialClientId: state.uri.queryParameters['clientId'],
+      ),
     ),
     GoRoute(
       path: '/admin/announcements',
@@ -250,6 +264,22 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: '/admin/vehicle-lookup',
       builder: (context, state) => const AdminVehicleLookupScreen(),
+    ),
+    GoRoute(
+      path: '/admin/technicians',
+      builder: (context, state) => const AdminTechniciansScreen(),
+    ),
+    GoRoute(
+      path: '/admin/repairs/:orderId',
+      builder: (context, state) =>
+          AdminRepairOrderScreen(orderDbId: state.pathParameters['orderId']!),
+    ),
+    GoRoute(
+      path: '/admin/repairs/:orderId/messages',
+      builder: (context, state) => RepairOrderMessagesScreen(
+        orderId: state.pathParameters['orderId']!,
+        myRole: RepairMessageSenderRole.admin,
+      ),
     ),
     GoRoute(
       path: '/support',

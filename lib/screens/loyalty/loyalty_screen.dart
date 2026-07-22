@@ -96,6 +96,53 @@ const List<_LoyaltyGoal> _loyaltyGoals = [
   ),
 ];
 
+class _SectionHeader extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final String title;
+  final String? trailing;
+
+  const _SectionHeader({
+    required this.icon,
+    required this.color,
+    required this.title,
+    this.trailing,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Row(
+          children: [
+            Container(
+              width: 30,
+              height: 30,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(VoltronRadii.sm),
+              ),
+              child: Icon(icon, size: 16, color: color),
+            ),
+            const SizedBox(width: 10),
+            Text(
+              title,
+              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
+            ),
+          ],
+        ),
+        if (trailing != null)
+          Text(
+            trailing!,
+            style: const TextStyle(color: VoltronColors.greyText, fontSize: 12),
+          ),
+      ],
+    );
+  }
+}
+
 class LoyaltyScreen extends ConsumerWidget {
   const LoyaltyScreen({super.key});
 
@@ -128,7 +175,9 @@ class LoyaltyScreen extends ConsumerWidget {
     final loyaltyPoints = ref.watch(profileProvider).loyaltyPoints;
     final claimedGoals =
         ref.watch(claimedLoyaltyGoalsProvider).valueOrNull ?? {};
-    final redemptions = ref.watch(myRedemptionsProvider).valueOrNull ?? [];
+    final redemptions = (ref.watch(myRedemptionsProvider).valueOrNull ?? [])
+        .where((r) => r.usedAt == null)
+        .toList();
 
     for (final goal in _loyaltyGoals) {
       if (!goal.manual &&
@@ -151,6 +200,16 @@ class LoyaltyScreen extends ConsumerWidget {
     final pointsProgress = nextReward == null
         ? 1.0
         : (loyaltyPoints / nextReward.points).clamp(0.0, 1.0);
+
+    final sortedGoals = [..._loyaltyGoals]
+      ..sort((a, b) {
+        final aDone = claimedGoals.contains(a.id);
+        final bDone = claimedGoals.contains(b.id);
+        if (aDone == bDone) return 0;
+        return aDone ? 1 : -1;
+      });
+    final sortedRewards = [...rewards]
+      ..sort((a, b) => a.points.compareTo(b.points));
 
     return Scaffold(
       backgroundColor: VoltronColors.deepBlack,
@@ -266,29 +325,14 @@ class LoyaltyScreen extends ConsumerWidget {
               icon: const Icon(Icons.qr_code_2_rounded),
               label: const Text('MON QR CODE FIDÉLITÉ'),
             ),
-            const SizedBox(height: 24),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'OBJECTIFS',
-                  style: TextStyle(
-                    fontSize: 12,
-                    letterSpacing: 1,
-                    fontWeight: FontWeight.w700,
-                    color: VoltronColors.greyText,
-                  ),
-                ),
-                Text(
-                  '$completedCount/${_loyaltyGoals.length} complétés',
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: VoltronColors.greyText,
-                  ),
-                ),
-              ],
+            const SizedBox(height: 28),
+            _SectionHeader(
+              icon: Icons.flag_rounded,
+              color: VoltronColors.electricYellow,
+              title: 'Objectifs',
+              trailing: '$completedCount/${_loyaltyGoals.length}',
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
             ClipRRect(
               borderRadius: BorderRadius.circular(VoltronRadii.pill),
               child: LinearProgressIndicator(
@@ -300,383 +344,304 @@ class LoyaltyScreen extends ConsumerWidget {
                 ),
               ),
             ),
-            const SizedBox(height: 6),
-            Theme(
-              data: Theme.of(
-                context,
-              ).copyWith(dividerColor: Colors.transparent),
-              child: ExpansionTile(
-                tilePadding: EdgeInsets.zero,
-                childrenPadding: const EdgeInsets.only(top: 8),
-                shape: const Border(),
-                collapsedShape: const Border(),
-                iconColor: VoltronColors.electricYellow,
-                collapsedIconColor: VoltronColors.greyText,
-                title: const Text(
-                  'Voir le détail des objectifs',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: VoltronColors.greyText,
+            const SizedBox(height: 14),
+            ...sortedGoals.map((goal) {
+              final isDone = claimedGoals.contains(goal.id);
+              return Container(
+                margin: const EdgeInsets.only(bottom: 10),
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: VoltronColors.cardBlack,
+                  borderRadius: BorderRadius.circular(VoltronRadii.md),
+                  border: Border.all(
+                    color: isDone
+                        ? VoltronColors.success.withValues(alpha: 0.5)
+                        : Colors.transparent,
                   ),
                 ),
-                children: _loyaltyGoals.map((goal) {
-                  final isDone = claimedGoals.contains(goal.id);
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 10),
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: VoltronColors.cardBlack,
-                      borderRadius: BorderRadius.circular(VoltronRadii.md),
-                      border: Border.all(
+                child: Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: VoltronColors.deepBlack,
+                        borderRadius: BorderRadius.circular(VoltronRadii.sm),
+                      ),
+                      child: Icon(
+                        isDone ? Icons.check_rounded : goal.icon,
                         color: isDone
-                            ? VoltronColors.success.withValues(alpha: 0.5)
-                            : Colors.transparent,
+                            ? VoltronColors.success
+                            : VoltronColors.electricYellow,
+                        size: 20,
                       ),
                     ),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 40,
-                          height: 40,
-                          alignment: Alignment.center,
-                          decoration: BoxDecoration(
-                            color: VoltronColors.deepBlack,
-                            borderRadius: BorderRadius.circular(
-                              VoltronRadii.sm,
-                            ),
-                          ),
-                          child: Icon(
-                            isDone ? Icons.check_rounded : goal.icon,
-                            color: isDone
-                                ? VoltronColors.success
-                                : VoltronColors.electricYellow,
-                            size: 20,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                goal.title,
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 13,
-                                  decoration: isDone
-                                      ? TextDecoration.lineThrough
-                                      : null,
-                                  color: isDone
-                                      ? VoltronColors.greyText
-                                      : Colors.white,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                goal.subtitle,
-                                style: const TextStyle(
-                                  color: VoltronColors.greyText,
-                                  fontSize: 11,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        if (isDone)
-                          const Icon(
-                            Icons.check_circle_rounded,
-                            color: VoltronColors.success,
-                            size: 20,
-                          )
-                        else if (goal.manual)
-                          TextButton(
-                            style: TextButton.styleFrom(
-                              backgroundColor: VoltronColors.electricYellow,
-                              foregroundColor: VoltronColors.deepBlack,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 8,
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(
-                                  VoltronRadii.pill,
-                                ),
-                              ),
-                            ),
-                            onPressed: () async {
-                              final credited = await ref
-                                  .read(loyaltyGoalsNotifierProvider)
-                                  .claim(goal.id, goal.points);
-                              if (!context.mounted) return;
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    credited
-                                        ? '+${goal.points} points crédités !'
-                                        : 'Déjà réclamé',
-                                  ),
-                                ),
-                              );
-                            },
-                            child: Text(
-                              '+${goal.points} pts',
-                              style: const TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          )
-                        else
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
                           Text(
-                            '+${goal.points} pts',
+                            goal.title,
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                              decoration: isDone
+                                  ? TextDecoration.lineThrough
+                                  : null,
+                              color: isDone
+                                  ? VoltronColors.greyText
+                                  : Colors.white,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            goal.subtitle,
                             style: const TextStyle(
-                              color: VoltronColors.electricYellow,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                      ],
-                    ),
-                  );
-                }).toList(),
-              ),
-            ),
-            const SizedBox(height: 24),
-            const Text(
-              'RÉCOMPENSES DISPONIBLES',
-              style: TextStyle(
-                fontSize: 12,
-                letterSpacing: 1,
-                fontWeight: FontWeight.w700,
-                color: VoltronColors.greyText,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Theme(
-              data: Theme.of(
-                context,
-              ).copyWith(dividerColor: Colors.transparent),
-              child: ExpansionTile(
-                tilePadding: EdgeInsets.zero,
-                childrenPadding: const EdgeInsets.only(top: 8),
-                shape: const Border(),
-                collapsedShape: const Border(),
-                iconColor: VoltronColors.electricYellow,
-                collapsedIconColor: VoltronColors.greyText,
-                title: const Text(
-                  'Voir le détail des récompenses',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: VoltronColors.greyText,
-                  ),
-                ),
-                children: rewards.map((reward) {
-                  final canAfford = loyaltyPoints >= reward.points;
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 10),
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: VoltronColors.cardBlack,
-                      borderRadius: BorderRadius.circular(VoltronRadii.md),
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 44,
-                          height: 44,
-                          decoration: BoxDecoration(
-                            color: VoltronColors.deepBlack,
-                            borderRadius: BorderRadius.circular(
-                              VoltronRadii.sm,
-                            ),
-                          ),
-                          child: Icon(
-                            reward.icon,
-                            color: VoltronColors.electricYellow,
-                            size: 20,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                reward.label,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 13,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                '${reward.points} points',
-                                style: const TextStyle(
-                                  color: VoltronColors.greyText,
-                                  fontSize: 11,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        TextButton(
-                          style: TextButton.styleFrom(
-                            backgroundColor: canAfford
-                                ? VoltronColors.electricYellow
-                                : VoltronColors.deepBlack,
-                            foregroundColor: canAfford
-                                ? VoltronColors.deepBlack
-                                : VoltronColors.greyText,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 14,
-                              vertical: 8,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(
-                                VoltronRadii.pill,
-                              ),
-                            ),
-                          ),
-                          onPressed: !canAfford
-                              ? null
-                              : () async {
-                                  try {
-                                    final redemption = await ref
-                                        .read(rewardsProvider.notifier)
-                                        .redeem(reward.id);
-                                    if (!context.mounted) return;
-                                    _showRedemptionDialog(context, redemption);
-                                  } catch (e) {
-                                    if (!context.mounted) return;
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text(
-                                          'Pas assez de points pour cette récompense',
-                                        ),
-                                      ),
-                                    );
-                                  }
-                                },
-                          child: Text(
-                            canAfford ? 'Échanger' : 'Pas assez de points',
-                            style: const TextStyle(
+                              color: VoltronColors.greyText,
                               fontSize: 11,
-                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (isDone)
+                      const Icon(
+                        Icons.check_circle_rounded,
+                        color: VoltronColors.success,
+                        size: 20,
+                      )
+                    else if (goal.manual)
+                      TextButton(
+                        style: TextButton.styleFrom(
+                          backgroundColor: VoltronColors.electricYellow,
+                          foregroundColor: VoltronColors.deepBlack,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(
+                              VoltronRadii.pill,
                             ),
                           ),
                         ),
-                      ],
-                    ),
-                  );
-                }).toList(),
-              ),
-            ),
-            if (redemptions.isNotEmpty) ...[
-              const SizedBox(height: 24),
-              const Text(
-                'MES CODES ÉCHANGÉS',
-                style: TextStyle(
-                  fontSize: 12,
-                  letterSpacing: 1,
-                  fontWeight: FontWeight.w700,
-                  color: VoltronColors.greyText,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Theme(
-                data: Theme.of(
-                  context,
-                ).copyWith(dividerColor: Colors.transparent),
-                child: ExpansionTile(
-                  tilePadding: EdgeInsets.zero,
-                  childrenPadding: const EdgeInsets.only(top: 8),
-                  shape: const Border(),
-                  collapsedShape: const Border(),
-                  iconColor: VoltronColors.electricYellow,
-                  collapsedIconColor: VoltronColors.greyText,
-                  title: Text(
-                    'Voir mes codes (${redemptions.length})',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: VoltronColors.greyText,
-                    ),
-                  ),
-                  children: redemptions
-                      .map(
-                        (r) => GestureDetector(
-                          onTap: () => _showRedemptionDialog(context, r),
-                          child: Container(
-                            margin: const EdgeInsets.only(bottom: 10),
-                            padding: const EdgeInsets.all(14),
-                            decoration: BoxDecoration(
-                              color: VoltronColors.cardBlack,
-                              borderRadius: BorderRadius.circular(
-                                VoltronRadii.md,
+                        onPressed: () async {
+                          final credited = await ref
+                              .read(loyaltyGoalsNotifierProvider)
+                              .claim(goal.id, goal.points);
+                          if (!context.mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                credited
+                                    ? '+${goal.points} points crédités !'
+                                    : 'Déjà réclamé',
                               ),
                             ),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        r.rewardLabel,
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.w600,
-                                          fontSize: 13,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        '${r.redeemedAt.toLocal().day.toString().padLeft(2, '0')}/${r.redeemedAt.toLocal().month.toString().padLeft(2, '0')}/${r.redeemedAt.toLocal().year}',
-                                        style: const TextStyle(
-                                          color: VoltronColors.greyText,
-                                          fontSize: 11,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 10,
-                                    vertical: 6,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: VoltronColors.deepBlack,
-                                    borderRadius: BorderRadius.circular(
-                                      VoltronRadii.sm,
-                                    ),
-                                    border: Border.all(
-                                      color: VoltronColors.electricYellow
-                                          .withValues(alpha: 0.5),
-                                    ),
-                                  ),
-                                  child: Text(
-                                    r.code,
-                                    style: const TextStyle(
-                                      color: VoltronColors.electricYellow,
-                                      fontWeight: FontWeight.w800,
-                                      letterSpacing: 2,
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
+                          );
+                        },
+                        child: Text(
+                          '+${goal.points} pts',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
                       )
-                      .toList(),
+                    else
+                      Text(
+                        '+${goal.points} pts',
+                        style: const TextStyle(
+                          color: VoltronColors.electricYellow,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                  ],
+                ),
+              );
+            }),
+            const SizedBox(height: 28),
+            _SectionHeader(
+              icon: Icons.card_giftcard_rounded,
+              color: VoltronColors.electricBlueGlow,
+              title: 'Récompenses disponibles',
+            ),
+            const SizedBox(height: 14),
+            ...sortedRewards.map((reward) {
+              final canAfford = loyaltyPoints >= reward.points;
+              return Container(
+                margin: const EdgeInsets.only(bottom: 10),
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: VoltronColors.cardBlack,
+                  borderRadius: BorderRadius.circular(VoltronRadii.md),
+                  border: Border.all(
+                    color: canAfford
+                        ? VoltronColors.electricYellow.withValues(alpha: 0.4)
+                        : Colors.transparent,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: VoltronColors.deepBlack,
+                        borderRadius: BorderRadius.circular(VoltronRadii.sm),
+                      ),
+                      child: Icon(
+                        reward.icon,
+                        color: VoltronColors.electricYellow,
+                        size: 20,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            reward.label,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '${reward.points} points',
+                            style: const TextStyle(
+                              color: VoltronColors.greyText,
+                              fontSize: 11,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    TextButton(
+                      style: TextButton.styleFrom(
+                        backgroundColor: canAfford
+                            ? VoltronColors.electricYellow
+                            : VoltronColors.deepBlack,
+                        foregroundColor: canAfford
+                            ? VoltronColors.deepBlack
+                            : VoltronColors.greyText,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 8,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(
+                            VoltronRadii.pill,
+                          ),
+                        ),
+                      ),
+                      onPressed: !canAfford
+                          ? null
+                          : () async {
+                              try {
+                                final redemption = await ref
+                                    .read(rewardsProvider.notifier)
+                                    .redeem(reward.id);
+                                if (!context.mounted) return;
+                                _showRedemptionDialog(context, redemption);
+                              } catch (e) {
+                                if (!context.mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Pas assez de points pour cette récompense',
+                                    ),
+                                  ),
+                                );
+                              }
+                            },
+                      child: Text(
+                        canAfford ? 'Échanger' : 'Pas assez de points',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
+            if (redemptions.isNotEmpty) ...[
+              const SizedBox(height: 28),
+              _SectionHeader(
+                icon: Icons.confirmation_number_rounded,
+                color: VoltronColors.success,
+                title: 'Mes codes échangés',
+                trailing: '${redemptions.length}',
+              ),
+              const SizedBox(height: 14),
+              SizedBox(
+                height: 92,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: redemptions.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 10),
+                  itemBuilder: (context, index) {
+                    final r = redemptions[index];
+                    return GestureDetector(
+                      onTap: () => _showRedemptionDialog(context, r),
+                      child: Container(
+                        width: 180,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: VoltronColors.cardBlack,
+                          borderRadius: BorderRadius.circular(VoltronRadii.md),
+                          border: Border.all(
+                            color: VoltronColors.electricYellow.withValues(
+                              alpha: 0.4,
+                            ),
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              r.rewardLabel,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 12,
+                                color: VoltronColors.greyText,
+                              ),
+                            ),
+                            Text(
+                              r.code,
+                              style: const TextStyle(
+                                color: VoltronColors.electricYellow,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 2,
+                                fontSize: 18,
+                              ),
+                            ),
+                            Text(
+                              '${r.redeemedAt.toLocal().day.toString().padLeft(2, '0')}/${r.redeemedAt.toLocal().month.toString().padLeft(2, '0')}/${r.redeemedAt.toLocal().year}',
+                              style: const TextStyle(
+                                color: VoltronColors.greyText,
+                                fontSize: 10,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
                 ),
               ),
             ],
-            const SizedBox(height: 20),
+            const SizedBox(height: 24),
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(

@@ -107,6 +107,17 @@ class RepairOrder {
   final String clientId;
   final bool archived;
 
+  /// Lien optionnel vers un véhicule enregistré (scooters.id) — permet
+  /// d'afficher kilométrage/batterie/couleur/photo ; reste null pour les
+  /// dossiers créés sans sélectionner de véhicule précis (scooterName suffit).
+  final String? scooterId;
+  final String? technicianId;
+  final String? dropoffDate;
+  final String? appointmentDay;
+  final String? appointmentTime;
+  final String arrivalCondition;
+  final String? dropoffReportUrl;
+
   const RepairOrder({
     required this.dbId,
     required this.id,
@@ -115,6 +126,13 @@ class RepairOrder {
     this.quote,
     required this.clientId,
     this.archived = false,
+    this.scooterId,
+    this.technicianId,
+    this.dropoffDate,
+    this.appointmentDay,
+    this.appointmentTime,
+    this.arrivalCondition = 'À compléter',
+    this.dropoffReportUrl,
   });
 
   RepairStep get currentStep => steps.firstWhere(

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../models/repair.dart';
 import '../../providers/repairs_provider.dart';
 import '../../theme/voltron_theme.dart';
-import '../../widgets/repair_order_card.dart';
 import 'admin_shell.dart';
 
 const List<String> _columns = [
@@ -130,7 +130,7 @@ class _BoardColumn extends StatelessWidget {
           const SizedBox(height: 10),
           ...orders.map(
             (order) => GestureDetector(
-              onTap: () => _showOrderDialog(context, order),
+              onTap: () => context.push('/admin/repairs/${order.dbId}'),
               child: Container(
                 margin: const EdgeInsets.only(bottom: 8),
                 padding: const EdgeInsets.all(10),
@@ -182,19 +182,6 @@ class _BoardColumn extends StatelessWidget {
               style: TextStyle(color: VoltronColors.greyText, fontSize: 11),
             ),
         ],
-      ),
-    );
-  }
-
-  void _showOrderDialog(BuildContext context, RepairOrder order) {
-    showDialog(
-      context: context,
-      builder: (dialogContext) => Dialog(
-        backgroundColor: Colors.transparent,
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 480),
-          child: SingleChildScrollView(child: RepairOrderCard(order: order)),
-        ),
       ),
     );
   }

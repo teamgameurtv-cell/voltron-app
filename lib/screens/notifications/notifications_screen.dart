@@ -94,7 +94,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                                     .read(notificationsProvider.notifier)
                                     .markRead(n.id);
                               }
-                              context.push(route);
+                              context.go(route);
                             },
                       child: Container(
                         padding: const EdgeInsets.all(14),

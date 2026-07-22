@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../providers/repairs_provider.dart';
 import '../../theme/voltron_theme.dart';
 import '../../widgets/repair_order_card.dart';
@@ -28,7 +29,10 @@ class AdminRepairsScreen extends ConsumerWidget {
             ...activeRepairs.map(
               (order) => Padding(
                 padding: const EdgeInsets.only(bottom: 14),
-                child: RepairOrderCard(order: order),
+                child: GestureDetector(
+                  onTap: () => context.push('/admin/repairs/${order.dbId}'),
+                  child: RepairOrderCard(order: order),
+                ),
               ),
             ),
           if (archivedRepairs.isNotEmpty) ...[

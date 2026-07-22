@@ -957,6 +957,299 @@ $$;
 
 grant execute on function client_update_booking_problem(uuid, text) to authenticated;
 
+-- ============ VALIDATION EN BOUTIQUE D'UN CODE DE RÉCOMPENSE ============
+-- Une fois le code présenté et utilisé en magasin, il doit devenir
+-- non réutilisable et disparaître de la liste "mes codes" du client, sans
+-- pour autant supprimer l'historique de l'échange.
+alter table reward_redemptions add column if not exists used_at timestamptz;
+
+create or replace function admin_use_reward_code(p_code text)
+returns table(
+  id uuid,
+  client_id uuid,
+  reward_label text,
+  points_spent int,
+  code text,
+  redeemed_at timestamptz,
+  used_at timestamptz
+)
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_id uuid;
+  v_used_at timestamptz;
+begin
+  if not is_admin() then
+    raise exception 'Réservé aux administrateurs';
+  end if;
+
+  select rr.id, rr.used_at into v_id, v_used_at
+  from reward_redemptions rr
+  where upper(rr.code) = upper(trim(p_code));
+
+  if v_id is null then
+    raise exception 'Code introuvable';
+  end if;
+  if v_used_at is not null then
+    raise exception 'Ce code a déjà été utilisé';
+  end if;
+
+  update reward_redemptions rr set used_at = now() where rr.id = v_id;
+
+  return query
+    select rr.id, rr.client_id, rr.reward_label, rr.points_spent, rr.code, rr.redeemed_at, rr.used_at
+    from reward_redemptions rr
+    where rr.id = v_id;
+end;
+$$;
+
+grant execute on function admin_use_reward_code(text) to authenticated;
+
+-- ============ FICHE TECHNIQUE VÉHICULE (kilométrage, batterie, couleur) ============
+alter table scooters add column if not exists mileage_km int not null default 0;
+alter table scooters add column if not exists battery_spec text not null default '';
+alter table scooters add column if not exists color text not null default '';
+
+-- ============ TECHNICIENS (annuaire simple, sans authentification dédiée) ============
+create table if not exists technicians (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  avatar_url text,
+  status text not null default 'hors_ligne' check (status in ('en_ligne','hors_ligne','absent')),
+  created_at timestamptz not null default now()
+);
+alter table technicians enable row level security;
+
+-- ============ DOSSIER RÉPARATION : véhicule lié, dépôt, technicien ============
+alter table repair_orders add column if not exists scooter_id uuid references scooters(id) on delete set null;
+alter table repair_orders add column if not exists technician_id uuid references technicians(id) on delete set null;
+alter table repair_orders add column if not exists dropoff_date text;
+alter table repair_orders add column if not exists appointment_day text;
+alter table repair_orders add column if not exists appointment_time text;
+alter table repair_orders add column if not exists arrival_condition text not null default 'À compléter';
+alter table repair_orders add column if not exists dropoff_report_url text;
+
+drop policy if exists "technicians_select_admin_or_assigned" on technicians;
+create policy "technicians_select_admin_or_assigned" on technicians for select using (
+  is_admin() or exists (
+    select 1 from repair_orders o where o.technician_id = technicians.id and o.client_id = auth.uid()
+  )
+);
+drop policy if exists "technicians_write_admin" on technicians;
+create policy "technicians_write_admin" on technicians for all using (is_admin()) with check (is_admin());
+
+insert into storage.buckets (id, name, public)
+select 'technician-avatars', 'technician-avatars', true
+where not exists (select 1 from storage.buckets where id = 'technician-avatars');
+
+drop policy if exists "technician avatars public read" on storage.objects;
+create policy "technician avatars public read" on storage.objects
+  for select using (bucket_id = 'technician-avatars');
+drop policy if exists "technician avatars admin write" on storage.objects;
+create policy "technician avatars admin write" on storage.objects
+  for insert with check (bucket_id = 'technician-avatars' and is_admin());
+drop policy if exists "technician avatars admin update" on storage.objects;
+create policy "technician avatars admin update" on storage.objects
+  for update using (bucket_id = 'technician-avatars' and is_admin());
+
+-- ============ CHECKLIST GÉNÉRIQUE PAR ÉTAPE ============
+-- Une ligne par sous-tâche affichée dans "ÉTAPE ACTUELLE". [kind] détermine le
+-- widget de rendu et quelle colonne fait foi : check -> done, value -> value_text
+-- (ex. kilométrage), counter -> counter_target (le compte réel est dérivé du
+-- nombre de lignes dans repair_order_photos, jamais stocké ici pour éviter toute
+-- désynchronisation), select -> selected_options (ex. accessoires fournis),
+-- note -> value_text (texte libre). order_id est dénormalisé (dérivable via
+-- step_id) pour permettre un simple .eq('order_id', ...) côté .stream().
+create table if not exists repair_order_step_tasks (
+  id uuid primary key default gen_random_uuid(),
+  order_id uuid not null references repair_orders(id) on delete cascade,
+  step_id uuid not null references repair_steps(id) on delete cascade,
+  kind text not null check (kind in ('check','value','counter','select','note')),
+  label text not null,
+  position int not null default 0,
+  done boolean not null default false,
+  value_text text,
+  counter_target int not null default 0,
+  selected_options text[] not null default array[]::text[],
+  updated_at timestamptz not null default now()
+);
+alter table repair_order_step_tasks enable row level security;
+
+drop policy if exists "repair_order_step_tasks_own_or_admin" on repair_order_step_tasks;
+create policy "repair_order_step_tasks_own_or_admin" on repair_order_step_tasks for select using (
+  exists (select 1 from repair_orders o where o.id = order_id and (o.client_id = auth.uid() or is_admin()))
+);
+drop policy if exists "repair_order_step_tasks_write_admin" on repair_order_step_tasks;
+create policy "repair_order_step_tasks_write_admin" on repair_order_step_tasks for all using (is_admin()) with check (is_admin());
+
+-- ============ PHOTOS DE DOSSIER ============
+create table if not exists repair_order_photos (
+  id uuid primary key default gen_random_uuid(),
+  order_id uuid not null references repair_orders(id) on delete cascade,
+  step_task_id uuid references repair_order_step_tasks(id) on delete set null,
+  url text not null,
+  created_at timestamptz not null default now()
+);
+alter table repair_order_photos enable row level security;
+
+drop policy if exists "repair_order_photos_own_or_admin" on repair_order_photos;
+create policy "repair_order_photos_own_or_admin" on repair_order_photos for select using (
+  exists (select 1 from repair_orders o where o.id = order_id and (o.client_id = auth.uid() or is_admin()))
+);
+drop policy if exists "repair_order_photos_write_admin" on repair_order_photos;
+create policy "repair_order_photos_write_admin" on repair_order_photos for all using (is_admin()) with check (is_admin());
+
+insert into storage.buckets (id, name, public)
+select 'repair-order-photos', 'repair-order-photos', true
+where not exists (select 1 from storage.buckets where id = 'repair-order-photos');
+
+drop policy if exists "repair order photos public read" on storage.objects;
+create policy "repair order photos public read" on storage.objects
+  for select using (bucket_id = 'repair-order-photos');
+drop policy if exists "repair order photos admin write" on storage.objects;
+create policy "repair order photos admin write" on storage.objects
+  for insert with check (bucket_id = 'repair-order-photos' and is_admin());
+drop policy if exists "repair order photos admin delete" on storage.objects;
+create policy "repair order photos admin delete" on storage.objects
+  for delete using (bucket_id = 'repair-order-photos' and is_admin());
+
+-- ============ DOCUMENTS DE DOSSIER ============
+create table if not exists repair_order_documents (
+  id uuid primary key default gen_random_uuid(),
+  order_id uuid not null references repair_orders(id) on delete cascade,
+  label text not null,
+  url text not null,
+  created_at timestamptz not null default now()
+);
+alter table repair_order_documents enable row level security;
+
+drop policy if exists "repair_order_documents_own_or_admin" on repair_order_documents;
+create policy "repair_order_documents_own_or_admin" on repair_order_documents for select using (
+  exists (select 1 from repair_orders o where o.id = order_id and (o.client_id = auth.uid() or is_admin()))
+);
+drop policy if exists "repair_order_documents_write_admin" on repair_order_documents;
+create policy "repair_order_documents_write_admin" on repair_order_documents for all using (is_admin()) with check (is_admin());
+
+insert into storage.buckets (id, name, public)
+select 'repair-order-documents', 'repair-order-documents', true
+where not exists (select 1 from storage.buckets where id = 'repair-order-documents');
+
+drop policy if exists "repair order documents public read" on storage.objects;
+create policy "repair order documents public read" on storage.objects
+  for select using (bucket_id = 'repair-order-documents');
+drop policy if exists "repair order documents admin write" on storage.objects;
+create policy "repair order documents admin write" on storage.objects
+  for insert with check (bucket_id = 'repair-order-documents' and is_admin());
+drop policy if exists "repair order documents admin delete" on storage.objects;
+create policy "repair order documents admin delete" on storage.objects
+  for delete using (bucket_id = 'repair-order-documents' and is_admin());
+
+-- Rapport de dépôt (PV dépôt) : un seul fichier attaché directement sur le dossier
+insert into storage.buckets (id, name, public)
+select 'dropoff-reports', 'dropoff-reports', true
+where not exists (select 1 from storage.buckets where id = 'dropoff-reports');
+
+drop policy if exists "dropoff reports public read" on storage.objects;
+create policy "dropoff reports public read" on storage.objects
+  for select using (bucket_id = 'dropoff-reports');
+drop policy if exists "dropoff reports admin write" on storage.objects;
+create policy "dropoff reports admin write" on storage.objects
+  for insert with check (bucket_id = 'dropoff-reports' and is_admin());
+drop policy if exists "dropoff reports admin update" on storage.objects;
+create policy "dropoff reports admin update" on storage.objects
+  for update using (bucket_id = 'dropoff-reports' and is_admin());
+
+-- ============ PIÈCES COMMANDÉES ============
+create table if not exists repair_order_parts (
+  id uuid primary key default gen_random_uuid(),
+  order_id uuid not null references repair_orders(id) on delete cascade,
+  label text not null,
+  reference text,
+  quantity int not null default 1,
+  price numeric(10,2) not null default 0,
+  status text not null default 'pending' check (status in ('pending','ordered','received','installed')),
+  created_at timestamptz not null default now()
+);
+alter table repair_order_parts enable row level security;
+
+drop policy if exists "repair_order_parts_own_or_admin" on repair_order_parts;
+create policy "repair_order_parts_own_or_admin" on repair_order_parts for select using (
+  exists (select 1 from repair_orders o where o.id = order_id and (o.client_id = auth.uid() or is_admin()))
+);
+drop policy if exists "repair_order_parts_write_admin" on repair_order_parts;
+create policy "repair_order_parts_write_admin" on repair_order_parts for all using (is_admin()) with check (is_admin());
+
+-- ============ MESSAGERIE PAR DOSSIER (indépendante du support client général) ============
+create table if not exists repair_order_messages (
+  id uuid primary key default gen_random_uuid(),
+  order_id uuid not null references repair_orders(id) on delete cascade,
+  sender_role text not null check (sender_role in ('client','admin')),
+  body text not null default '',
+  attachment_url text,
+  attachment_type text,
+  created_at timestamptz not null default now()
+);
+alter table repair_order_messages enable row level security;
+
+drop policy if exists "repair_order_messages_select_own_or_admin" on repair_order_messages;
+create policy "repair_order_messages_select_own_or_admin" on repair_order_messages for select using (
+  is_admin() or exists (select 1 from repair_orders o where o.id = order_id and o.client_id = auth.uid())
+);
+drop policy if exists "repair_order_messages_insert_own_or_admin" on repair_order_messages;
+create policy "repair_order_messages_insert_own_or_admin" on repair_order_messages for insert with check (
+  is_admin() or exists (select 1 from repair_orders o where o.id = order_id and o.client_id = auth.uid())
+);
+
+insert into storage.buckets (id, name, public)
+select 'repair-order-attachments', 'repair-order-attachments', true
+where not exists (select 1 from storage.buckets where id = 'repair-order-attachments');
+
+drop policy if exists "repair order attachments public read" on storage.objects;
+create policy "repair order attachments public read" on storage.objects
+  for select using (bucket_id = 'repair-order-attachments');
+drop policy if exists "repair order attachments authenticated write" on storage.objects;
+create policy "repair order attachments authenticated write" on storage.objects
+  for insert with check (bucket_id = 'repair-order-attachments' and auth.uid() is not null);
+
+-- ============ HISTORIQUE DU DOSSIER (journal d'audit) ============
+-- Seules les actions significatives sont journalisées (étape avancée, devis,
+-- technicien assigné, état d'arrivée, PV dépôt, pièces reçues, archivage) —
+-- pas chaque coche de checklist ni chaque message, déjà horodatés ailleurs.
+create table if not exists repair_order_events (
+  id uuid primary key default gen_random_uuid(),
+  order_id uuid not null references repair_orders(id) on delete cascade,
+  actor_role text not null check (actor_role in ('client','admin','system')),
+  event_type text not null,
+  description text not null,
+  created_at timestamptz not null default now()
+);
+alter table repair_order_events enable row level security;
+
+drop policy if exists "repair_order_events_select_own_or_admin" on repair_order_events;
+create policy "repair_order_events_select_own_or_admin" on repair_order_events for select using (
+  exists (select 1 from repair_orders o where o.id = order_id and (o.client_id = auth.uid() or is_admin()))
+);
+drop policy if exists "repair_order_events_insert_own_or_admin" on repair_order_events;
+create policy "repair_order_events_insert_own_or_admin" on repair_order_events for insert with check (
+  is_admin() or exists (select 1 from repair_orders o where o.id = order_id and o.client_id = auth.uid())
+);
+
+-- ============ NOTES INTERNES CLIENT ============
+-- Table séparée de `profiles` (que le client peut déjà lire pour sa propre
+-- ligne) : une note du style "Client fidèle" ne doit jamais pouvoir remonter
+-- côté client, donc accès strictement admin-only de bout en bout.
+create table if not exists client_internal_notes (
+  client_id uuid primary key references profiles(id) on delete cascade,
+  note text not null default '',
+  updated_at timestamptz not null default now()
+);
+alter table client_internal_notes enable row level security;
+
+drop policy if exists "client_internal_notes_admin_only" on client_internal_notes;
+create policy "client_internal_notes_admin_only" on client_internal_notes for all using (is_admin()) with check (is_admin());
+
 -- ============ TEMPS RÉEL ============
 -- Sans ça, l'app ne reçoit jamais les mises à jour en direct : il faut
 -- explicitement ajouter chaque table à la publication "supabase_realtime"
@@ -970,7 +1263,10 @@ begin
     'products', 'stock_movements', 'repair_services', 'repair_orders',
     'repair_steps', 'quotes', 'quote_lines', 'rewards', 'subscriptions',
     'scooters', 'notifications', 'loyalty_goal_claims', 'promo_banner',
-    'reward_redemptions', 'support_tickets', 'support_messages'
+    'reward_redemptions', 'support_tickets', 'support_messages',
+    'technicians', 'repair_order_step_tasks', 'repair_order_photos',
+    'repair_order_documents', 'repair_order_parts', 'repair_order_messages',
+    'repair_order_events', 'client_internal_notes'
   ]
   loop
     if not exists (

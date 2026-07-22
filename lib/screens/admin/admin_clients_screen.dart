@@ -47,7 +47,11 @@ String _formatFrenchDate(DateTime date) =>
     '${date.day} ${bookingMonthNames[date.month - 1]} ${date.year}';
 
 class AdminClientsScreen extends ConsumerStatefulWidget {
-  const AdminClientsScreen({super.key});
+  /// Ouvre directement la fiche de ce client (ex. depuis "Véhicule volé")
+  /// plutôt que d'attendre une recherche manuelle.
+  final String? initialClientId;
+
+  const AdminClientsScreen({super.key, this.initialClientId});
 
   @override
   ConsumerState<AdminClientsScreen> createState() => _AdminClientsScreenState();
@@ -57,6 +61,12 @@ class _AdminClientsScreenState extends ConsumerState<AdminClientsScreen> {
   final _searchController = TextEditingController();
   String _query = '';
   String? _selectedClientId;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedClientId = widget.initialClientId;
+  }
 
   @override
   void dispose() {

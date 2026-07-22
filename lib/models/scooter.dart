@@ -6,6 +6,9 @@ class OwnedScooter {
   final String serialNumber;
   final DateTime purchaseDate;
   final String? imageUrl;
+  final int mileageKm;
+  final String batterySpec;
+  final String color;
 
   const OwnedScooter({
     required this.id,
@@ -15,6 +18,9 @@ class OwnedScooter {
     required this.serialNumber,
     required this.purchaseDate,
     this.imageUrl,
+    this.mileageKm = 0,
+    this.batterySpec = '',
+    this.color = '',
   });
 
   String get formattedPurchaseDate =>
@@ -46,6 +52,9 @@ class OwnedScooter {
       serialNumber: map['serial_number'] as String? ?? '',
       purchaseDate: DateTime.parse(map['purchase_date'] as String),
       imageUrl: map['image_url'] as String?,
+      mileageKm: map['mileage_km'] as int? ?? 0,
+      batterySpec: map['battery_spec'] as String? ?? '',
+      color: map['color'] as String? ?? '',
     );
   }
 }

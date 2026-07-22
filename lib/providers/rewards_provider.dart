@@ -44,6 +44,19 @@ class RewardsNotifier extends StateNotifier<List<Reward>> {
     return RewardRedemption.fromMap(row);
   }
 
+  /// L'admin valide un code présenté en boutique : le marque utilisé (donc
+  /// non réutilisable, et il disparaît de la liste du client) et renvoie
+  /// l'échange complet pour afficher une confirmation (client, récompense...).
+  /// Lève une [PostgrestException] si le code est introuvable ou déjà utilisé.
+  Future<RewardRedemption> useCode(String code) async {
+    final rows = await _client.rpc(
+      'admin_use_reward_code',
+      params: {'p_code': code},
+    );
+    final row = (rows as List).first as Map<String, dynamic>;
+    return RewardRedemption.fromMap(row);
+  }
+
   @override
   void dispose() {
     _sub?.cancel();

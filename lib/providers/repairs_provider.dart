@@ -2,11 +2,13 @@ import 'dart:async';
 import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../data/repair_step_task_templates.dart';
 import '../models/app_notification.dart';
 import '../models/booking.dart';
 import '../models/repair.dart';
 import 'auth_provider.dart';
 import 'notifications_provider.dart';
+import 'repair_order_events_log.dart';
 
 String _today() {
   final now = DateTime.now();
@@ -109,6 +111,14 @@ class RepairsNotifier extends StateNotifier<List<RepairOrder>> {
             scooterName: o['scooter_name'] as String,
             clientId: o['client_id'] as String,
             archived: o['archived'] as bool? ?? false,
+            scooterId: o['scooter_id'] as String?,
+            technicianId: o['technician_id'] as String?,
+            dropoffDate: o['dropoff_date'] as String?,
+            appointmentDay: o['appointment_day'] as String?,
+            appointmentTime: o['appointment_time'] as String?,
+            arrivalCondition:
+                o['arrival_condition'] as String? ?? 'À compléter',
+            dropoffReportUrl: o['dropoff_report_url'] as String?,
             steps: steps
                 .map(
                   (s) => RepairStep(
@@ -133,6 +143,10 @@ class RepairsNotifier extends StateNotifier<List<RepairOrder>> {
     required String scooterName,
     required String clientId,
     String? note,
+    String? scooterId,
+    String? dropoffDate,
+    String? appointmentDay,
+    String? appointmentTime,
   }) async {
     final orderRow = await _client
         .from('repair_orders')
@@ -140,11 +154,15 @@ class RepairsNotifier extends StateNotifier<List<RepairOrder>> {
           'display_id': displayId,
           'scooter_name': scooterName,
           'client_id': clientId,
+          'scooter_id': scooterId,
+          'dropoff_date': dropoffDate,
+          'appointment_day': appointmentDay,
+          'appointment_time': appointmentTime,
         })
         .select()
         .single();
 
-    await _client.from('repair_steps').insert([
+    final stepRows = await _client.from('repair_steps').insert([
       for (var i = 0; i < repairStepLabels.length; i++)
         {
           'order_id': orderRow['id'],
@@ -155,7 +173,38 @@ class RepairsNotifier extends StateNotifier<List<RepairOrder>> {
           if (i == 0 && note != null && note.trim().isNotEmpty)
             'note': note.trim(),
         },
-    ]);
+    ]).select();
+
+    // Sème la checklist de chaque étape à partir du modèle — comme les 8
+    // repair_steps ci-dessus, tout est créé d'un coup pour que la checklist
+    // de l'étape courante soit toujours prête, quelle que soit l'étape.
+    final taskRows = <Map<String, dynamic>>[];
+    for (final stepRow in stepRows) {
+      final label = stepRow['label'] as String;
+      final template = templateForStep(label);
+      for (var i = 0; i < template.length; i++) {
+        final t = template[i];
+        taskRows.add({
+          'order_id': orderRow['id'],
+          'step_id': stepRow['id'],
+          'kind': t.kind.name,
+          'label': t.label,
+          'position': i,
+          'counter_target': t.counterTarget,
+        });
+      }
+    }
+    if (taskRows.isNotEmpty) {
+      await _client.from('repair_order_step_tasks').insert(taskRows);
+    }
+
+    await logRepairOrderEvent(
+      _client,
+      orderId: orderRow['id'] as String,
+      actorRole: 'admin',
+      eventType: 'created',
+      description: 'Dossier créé',
+    );
   }
 
   Future<void> advanceStep(String orderDbId) async {
@@ -182,6 +231,13 @@ class RepairsNotifier extends StateNotifier<List<RepairOrder>> {
           .from('repair_orders')
           .update({'archived': true})
           .eq('id', orderDbId);
+      await logRepairOrderEvent(
+        _client,
+        orderId: orderDbId,
+        actorRole: 'admin',
+        eventType: 'step_advanced',
+        description: 'Dossier clôturé (${order.steps.last.label})',
+      );
       ref
           .read(notificationsProvider.notifier)
           .notifyClient(
@@ -198,6 +254,14 @@ class RepairsNotifier extends StateNotifier<List<RepairOrder>> {
         .update({'status': 'current', 'step_date': _today()})
         .eq('id', stepsRows[currentIndex + 1]['id']);
 
+    await logRepairOrderEvent(
+      _client,
+      orderId: orderDbId,
+      actorRole: 'admin',
+      eventType: 'step_advanced',
+      description: 'Étape suivante : ${order.steps[currentIndex + 1].label}',
+    );
+
     ref
         .read(notificationsProvider.notifier)
         .notifyClient(
@@ -213,6 +277,13 @@ class RepairsNotifier extends StateNotifier<List<RepairOrder>> {
         .from('repair_orders')
         .update({'archived': archived})
         .eq('id', orderDbId);
+    await logRepairOrderEvent(
+      _client,
+      orderId: orderDbId,
+      actorRole: 'admin',
+      eventType: archived ? 'archived' : 'unarchived',
+      description: archived ? 'Dossier archivé' : 'Dossier désarchivé',
+    );
   }
 
   /// Envoie un devis (lignes détaillées et/ou fichier joint) et fait avancer le
@@ -249,6 +320,13 @@ class RepairsNotifier extends StateNotifier<List<RepairOrder>> {
       ]);
     }
 
+    await logRepairOrderEvent(
+      _client,
+      orderId: orderDbId,
+      actorRole: 'admin',
+      eventType: 'quote_sent',
+      description: 'Devis envoyé au client',
+    );
     await advanceStep(orderDbId);
     ref
         .read(notificationsProvider.notifier)
@@ -305,6 +383,13 @@ class RepairsNotifier extends StateNotifier<List<RepairOrder>> {
         .from('quotes')
         .update({'status': 'accepted'})
         .eq('id', order.quote!.dbId);
+    await logRepairOrderEvent(
+      _client,
+      orderId: orderDbId,
+      actorRole: 'client',
+      eventType: 'quote_accepted',
+      description: 'Devis accepté par le client',
+    );
     await advanceStep(orderDbId);
   }
 
@@ -315,6 +400,13 @@ class RepairsNotifier extends StateNotifier<List<RepairOrder>> {
         .from('quotes')
         .update({'status': 'refused'})
         .eq('id', order.quote!.dbId);
+    await logRepairOrderEvent(
+      _client,
+      orderId: orderDbId,
+      actorRole: 'client',
+      eventType: 'quote_refused',
+      description: 'Devis refusé par le client',
+    );
   }
 
   @override

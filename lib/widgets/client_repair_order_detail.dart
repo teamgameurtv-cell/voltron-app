@@ -10,7 +10,11 @@ class ClientRepairOrderDetail extends StatelessWidget {
   final RepairOrder order;
   final bool collapsible;
 
-  const ClientRepairOrderDetail({super.key, required this.order, this.collapsible = false});
+  const ClientRepairOrderDetail({
+    super.key,
+    required this.order,
+    this.collapsible = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -25,6 +29,12 @@ class ClientRepairOrderDetail extends StatelessWidget {
             onPressed: () => context.push('/repairs/quote/${order.dbId}'),
             child: const Text('VOIR LE DEVIS'),
           ),
+        const SizedBox(height: 4),
+        TextButton.icon(
+          onPressed: () => context.push('/repairs/messages/${order.dbId}'),
+          icon: const Icon(Icons.chat_bubble_outline_rounded, size: 16),
+          label: const Text('Message à l\'atelier'),
+        ),
       ],
     );
 
@@ -39,8 +49,17 @@ class ClientRepairOrderDetail extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text('Dossier #${order.id}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-            Text(order.scooterName, style: const TextStyle(color: VoltronColors.greyText, fontSize: 13)),
+            Text(
+              'Dossier #${order.id}',
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+            ),
+            Text(
+              order.scooterName,
+              style: const TextStyle(
+                color: VoltronColors.greyText,
+                fontSize: 13,
+              ),
+            ),
             const SizedBox(height: 16),
             content,
           ],
@@ -77,12 +96,24 @@ class ClientRepairOrderDetail extends StatelessWidget {
                 width: 8,
                 height: 8,
                 margin: const EdgeInsets.only(right: 8),
-                decoration: BoxDecoration(color: statusColor, shape: BoxShape.circle),
+                decoration: BoxDecoration(
+                  color: statusColor,
+                  shape: BoxShape.circle,
+                ),
               ),
-              Text('Dossier #${order.id}', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+              Text(
+                'Dossier #${order.id}',
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
             ],
           ),
-          subtitle: Text(order.scooterName, style: const TextStyle(color: VoltronColors.greyText, fontSize: 12)),
+          subtitle: Text(
+            order.scooterName,
+            style: const TextStyle(color: VoltronColors.greyText, fontSize: 12),
+          ),
           children: [content],
         ),
       ),
@@ -130,17 +161,37 @@ class _TimelineTile extends StatelessWidget {
                   style: TextStyle(
                     fontWeight: FontWeight.w700,
                     fontSize: 13,
-                    color: step.status == RepairStepStatus.pending ? VoltronColors.greyText : Colors.white,
+                    color: step.status == RepairStepStatus.pending
+                        ? VoltronColors.greyText
+                        : Colors.white,
                   ),
                 ),
                 if (step.date != null)
-                  Text(step.date!, style: const TextStyle(color: VoltronColors.greyText, fontSize: 11))
+                  Text(
+                    step.date!,
+                    style: const TextStyle(
+                      color: VoltronColors.greyText,
+                      fontSize: 11,
+                    ),
+                  )
                 else
-                  const Text('En attente', style: TextStyle(color: VoltronColors.greyText, fontSize: 11)),
+                  const Text(
+                    'En attente',
+                    style: TextStyle(
+                      color: VoltronColors.greyText,
+                      fontSize: 11,
+                    ),
+                  ),
                 if ((step.note ?? '').isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.only(top: 4),
-                    child: Text(step.note!, style: const TextStyle(color: VoltronColors.electricBlueGlow, fontSize: 12)),
+                    child: Text(
+                      step.note!,
+                      style: const TextStyle(
+                        color: VoltronColors.electricBlueGlow,
+                        fontSize: 12,
+                      ),
+                    ),
                   ),
               ],
             ),

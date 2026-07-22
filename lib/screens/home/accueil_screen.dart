@@ -2,19 +2,21 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../models/booking.dart';
+import '../../models/product.dart';
 import '../../models/repair.dart';
 import '../../models/reward.dart';
-import '../../models/shortcut_option.dart';
 import '../../providers/account_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/bookings_provider.dart';
+import '../../providers/cart_provider.dart';
+import '../../providers/catalog_provider.dart';
 import '../../providers/promo_banner_provider.dart';
 import '../../providers/repairs_provider.dart';
 import '../../providers/rewards_provider.dart';
 import '../../providers/subscription_provider.dart';
 import '../../theme/voltron_theme.dart';
 import '../../widgets/app_header.dart';
-import '../../widgets/quick_access_button.dart';
+import '../../widgets/product_visual.dart';
 
 class AccueilScreen extends ConsumerWidget {
   const AccueilScreen({super.key});
@@ -53,26 +55,7 @@ class AccueilScreen extends ConsumerWidget {
               _buildRepairInProgress(context, activeOrder),
             ],
             const SizedBox(height: 24),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                _sectionTitle('Raccourcis'),
-                GestureDetector(
-                  onTap: () => _showEditShortcutsDialog(
-                    context,
-                    ref,
-                    profile.quickShortcuts,
-                  ),
-                  child: const Icon(
-                    Icons.edit_outlined,
-                    size: 18,
-                    color: VoltronColors.greyText,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            _buildQuickAccessGrid(context, profile.quickShortcuts),
+            _buildFeaturedShop(context, ref),
             const SizedBox(height: 24),
             _buildPromoBanner(context, ref),
           ],
@@ -448,93 +431,49 @@ class AccueilScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildQuickAccessGrid(BuildContext context, List<String> shortcutIds) {
-    final selected = shortcutIds
-        .map((id) => allShortcuts.where((s) => s.id == id).firstOrNull)
-        .whereType<ShortcutOption>()
+  /// Vitrine boutique sur l'accueil : remplace l'ancienne grille de
+  /// raccourcis par des produits (coups de cœur en priorité) pour donner
+  /// envie de parcourir la boutique et d'acheter directement depuis l'accueil.
+  Widget _buildFeaturedShop(BuildContext context, WidgetRef ref) {
+    final products = ref.watch(catalogProvider);
+    if (products.isEmpty) return const SizedBox.shrink();
+    final bestSellers = products.where((p) => p.isBestSeller).toList();
+    final display = (bestSellers.isEmpty ? products : bestSellers)
+        .take(10)
         .toList();
-    return GridView.count(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      crossAxisCount: 4,
-      mainAxisSpacing: 12,
-      crossAxisSpacing: 12,
-      children: selected
-          .map(
-            (s) => QuickAccessButton(
-              icon: s.icon,
-              label: s.label,
-              onTap: () => context.push(s.route),
-            ),
-          )
-          .toList(),
-    );
-  }
 
-  void _showEditShortcutsDialog(
-    BuildContext context,
-    WidgetRef ref,
-    List<String> current,
-  ) {
-    final selected = {...current};
-    showDialog(
-      context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (dialogContext, setDialogState) => AlertDialog(
-          backgroundColor: VoltronColors.cardBlack,
-          title: const Text('Personnaliser mes raccourcis'),
-          content: SizedBox(
-            width: 360,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: allShortcuts
-                    .map(
-                      (s) => CheckboxListTile(
-                        value: selected.contains(s.id),
-                        title: Text(
-                          s.label,
-                          style: const TextStyle(fontSize: 13),
-                        ),
-                        secondary: Icon(
-                          s.icon,
-                          color: VoltronColors.electricYellow,
-                          size: 20,
-                        ),
-                        activeColor: VoltronColors.electricYellow,
-                        checkColor: VoltronColors.deepBlack,
-                        onChanged: (checked) => setDialogState(() {
-                          if (checked == true) {
-                            selected.add(s.id);
-                          } else {
-                            selected.remove(s.id);
-                          }
-                        }),
-                      ),
-                    )
-                    .toList(),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            _sectionTitle('Coups de cœur boutique'),
+            GestureDetector(
+              onTap: () => context.go('/shop'),
+              child: const Text(
+                'Voir tout',
+                style: TextStyle(
+                  color: VoltronColors.electricYellow,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text('Annuler'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                final ordered = allShortcuts
-                    .map((s) => s.id)
-                    .where(selected.contains)
-                    .toList();
-                ref.read(profileProvider.notifier).updateShortcuts(ordered);
-                Navigator.of(dialogContext).pop();
-              },
-              child: const Text('ENREGISTRER'),
             ),
           ],
         ),
-      ),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 208,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: display.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 12),
+            itemBuilder: (context, index) =>
+                _ShopProductCard(product: display[index]),
+          ),
+        ),
+      ],
     );
   }
 
@@ -600,6 +539,94 @@ class AccueilScreen extends ConsumerWidget {
             color: VoltronColors.electricBlueGlow,
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _ShopProductCard extends ConsumerWidget {
+  final Product product;
+
+  const _ShopProductCard({required this.product});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return GestureDetector(
+      onTap: () => context.push('/shop/product/${product.id}'),
+      child: Container(
+        width: 148,
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: VoltronColors.cardBlack,
+          borderRadius: BorderRadius.circular(VoltronRadii.md),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            AspectRatio(
+              aspectRatio: 1.2,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(VoltronRadii.sm),
+                child: Container(
+                  color: VoltronColors.deepBlack,
+                  child: ProductVisual(
+                    product: product,
+                    width: double.infinity,
+                    height: double.infinity,
+                    iconSize: 34,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              product.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 6),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  product.formattedPrice,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    color: VoltronColors.electricYellow,
+                  ),
+                ),
+                InkWell(
+                  borderRadius: BorderRadius.circular(20),
+                  onTap: () {
+                    ref.read(cartProvider.notifier).add(product);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('${product.name} ajouté au panier'),
+                        duration: const Duration(seconds: 1),
+                      ),
+                    );
+                  },
+                  child: Container(
+                    width: 26,
+                    height: 26,
+                    alignment: Alignment.center,
+                    decoration: const BoxDecoration(
+                      color: VoltronColors.electricYellow,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.add_rounded,
+                      size: 16,
+                      color: VoltronColors.deepBlack,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../models/scooter.dart';
 import '../../providers/admin_crm_provider.dart';
 import '../../theme/voltron_theme.dart';
@@ -31,6 +32,7 @@ class _AdminVehicleLookupScreenState
   @override
   Widget build(BuildContext context) {
     final resultsAsync = ref.watch(vehicleSerialSearchProvider(_query));
+    final totalScooters = ref.watch(allScootersCountProvider).valueOrNull;
 
     return AdminShell(
       selected: AdminSection.vehicleLookup,
@@ -40,10 +42,58 @@ class _AdminVehicleLookupScreenState
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text(
-              'Retrouvez le propriétaire d\'une trottinette à partir de son numéro de série — '
-              'utile en cas de vol ou de véhicule retrouvé.',
-              style: TextStyle(color: VoltronColors.greyText, fontSize: 13),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Text(
+                    'Retrouvez le propriétaire d\'une trottinette à partir de son numéro de série — '
+                    'utile en cas de vol ou de véhicule retrouvé.',
+                    style: const TextStyle(
+                      color: VoltronColors.greyText,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+                if (totalScooters != null) ...[
+                  const SizedBox(width: 14),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: VoltronColors.cardBlack,
+                      borderRadius: BorderRadius.circular(VoltronRadii.md),
+                      border: Border.all(
+                        color: VoltronColors.electricYellow.withValues(
+                          alpha: 0.3,
+                        ),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Text(
+                          '$totalScooters',
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w900,
+                            color: VoltronColors.electricYellow,
+                          ),
+                        ),
+                        const Text(
+                          'véhicules',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: VoltronColors.greyText,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
             ),
             const SizedBox(height: 16),
             TextField(
@@ -199,48 +249,63 @@ class _VehicleResultCard extends ConsumerWidget {
               style: TextStyle(color: VoltronColors.greyText, fontSize: 12),
             )
           else
-            Row(
-              children: [
-                ClientAvatar(avatarUrl: owner.avatarUrl, radius: 20),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+            Material(
+              color: Colors.transparent,
+              borderRadius: BorderRadius.circular(VoltronRadii.sm),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(VoltronRadii.sm),
+                onTap: () => context.go('/admin/clients?clientId=${owner.id}'),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Row(
                     children: [
-                      Row(
-                        children: [
-                          Text(
-                            owner.fullName,
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
+                      ClientAvatar(avatarUrl: owner.avatarUrl, radius: 20),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Text(
+                                  owner.fullName,
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                if (plan != null) ...[
+                                  const SizedBox(width: 8),
+                                  CareBadge(plan: plan),
+                                ],
+                              ],
                             ),
-                          ),
-                          if (plan != null) ...[
-                            const SizedBox(width: 8),
-                            CareBadge(plan: plan),
+                            Text(
+                              owner.email,
+                              style: const TextStyle(
+                                color: VoltronColors.greyText,
+                                fontSize: 12,
+                              ),
+                            ),
+                            if (owner.phone.isNotEmpty)
+                              Text(
+                                owner.phone,
+                                style: const TextStyle(
+                                  color: VoltronColors.greyText,
+                                  fontSize: 12,
+                                ),
+                              ),
                           ],
-                        ],
-                      ),
-                      Text(
-                        owner.email,
-                        style: const TextStyle(
-                          color: VoltronColors.greyText,
-                          fontSize: 12,
                         ),
                       ),
-                      if (owner.phone.isNotEmpty)
-                        Text(
-                          owner.phone,
-                          style: const TextStyle(
-                            color: VoltronColors.greyText,
-                            fontSize: 12,
-                          ),
-                        ),
+                      const Icon(
+                        Icons.chevron_right_rounded,
+                        color: VoltronColors.greyText,
+                      ),
                     ],
                   ),
                 ),
-              ],
+              ),
             ),
         ],
       ),

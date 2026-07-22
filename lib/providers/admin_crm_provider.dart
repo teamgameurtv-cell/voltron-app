@@ -54,6 +54,45 @@ final clientScootersProvider =
           .map((rows) => rows.map(OwnedScooter.fromMap).toList());
     });
 
+/// Nombre total de véhicules enregistrés, tous clients confondus — affiché
+/// en repère rapide en haut de la page "Véhicule volé".
+final allScootersCountProvider = StreamProvider<int>((ref) {
+  return ref
+      .watch(supabaseProvider)
+      .from('scooters')
+      .stream(primaryKey: ['id'])
+      .map((rows) => rows.length);
+});
+
+/// Fiche d'un véhicule précis par son id (différent de [clientScootersProvider],
+/// qui filtre par propriétaire) — utilisé quand un dossier de réparation est
+/// lié à un véhicule enregistré.
+final scooterByIdProvider = StreamProvider.family<OwnedScooter?, String>((
+  ref,
+  scooterId,
+) {
+  return ref
+      .watch(supabaseProvider)
+      .from('scooters')
+      .stream(primaryKey: ['id'])
+      .eq('id', scooterId)
+      .map((rows) => rows.isEmpty ? null : OwnedScooter.fromMap(rows.first));
+});
+
+/// Note interne admin sur un client (ex. "Client fidèle") — table séparée de
+/// `profiles`, jamais lisible par le client lui-même (voir schema.sql).
+final clientInternalNotesProvider = StreamProvider.family<String, String>((
+  ref,
+  clientId,
+) {
+  return ref
+      .watch(supabaseProvider)
+      .from('client_internal_notes')
+      .stream(primaryKey: ['client_id'])
+      .eq('client_id', clientId)
+      .map((rows) => rows.isEmpty ? '' : rows.first['note'] as String? ?? '');
+});
+
 /// Recherche un véhicule par numéro de série, tous propriétaires confondus —
 /// utile pour retrouver le propriétaire d'une trottinette volée/retrouvée.
 final vehicleSerialSearchProvider =
@@ -182,6 +221,9 @@ class AdminCrmActions {
     String? model,
     String? serialNumber,
     DateTime? purchaseDate,
+    int? mileageKm,
+    String? batterySpec,
+    String? color,
   }) async {
     await _client
         .from('scooters')
@@ -191,8 +233,20 @@ class AdminCrmActions {
           if (serialNumber != null) 'serial_number': serialNumber,
           if (purchaseDate != null)
             'purchase_date': purchaseDate.toIso8601String().split('T').first,
+          if (mileageKm != null) 'mileage_km': mileageKm,
+          if (batterySpec != null) 'battery_spec': batterySpec,
+          if (color != null) 'color': color,
         })
         .eq('id', scooterId);
+  }
+
+  /// Note interne visible uniquement de l'admin (ex. "Client fidèle").
+  Future<void> updateInternalNotes(String clientId, String note) async {
+    await _client.from('client_internal_notes').upsert({
+      'client_id': clientId,
+      'note': note,
+      'updated_at': DateTime.now().toIso8601String(),
+    });
   }
 
   Future<void> removeScooter(String scooterId) async {

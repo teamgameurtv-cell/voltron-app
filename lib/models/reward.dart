@@ -8,7 +8,8 @@ const Map<String, IconData> rewardIconRegistry = {
   'star': Icons.star_rounded,
 };
 
-IconData iconForRewardName(String name) => rewardIconRegistry[name] ?? Icons.card_giftcard_rounded;
+IconData iconForRewardName(String name) =>
+    rewardIconRegistry[name] ?? Icons.card_giftcard_rounded;
 
 class Reward {
   final String id;
@@ -35,26 +36,34 @@ class Reward {
 
 class RewardRedemption {
   final String id;
+  final String? clientId;
   final String code;
   final String rewardLabel;
   final int pointsSpent;
   final DateTime redeemedAt;
+  final DateTime? usedAt;
 
   const RewardRedemption({
     required this.id,
+    this.clientId,
     required this.code,
     required this.rewardLabel,
     required this.pointsSpent,
     required this.redeemedAt,
+    this.usedAt,
   });
 
   factory RewardRedemption.fromMap(Map<String, dynamic> map) {
     return RewardRedemption(
       id: map['id'] as String,
+      clientId: map['client_id'] as String?,
       code: map['code'] as String,
       rewardLabel: map['reward_label'] as String,
       pointsSpent: map['points_spent'] as int,
       redeemedAt: DateTime.parse(map['redeemed_at'] as String),
+      usedAt: map['used_at'] != null
+          ? DateTime.parse(map['used_at'] as String)
+          : null,
     );
   }
 }

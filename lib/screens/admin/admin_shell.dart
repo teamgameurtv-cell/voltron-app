@@ -11,6 +11,7 @@ enum AdminSection {
   bookings,
   repairs,
   repairsBoard,
+  technicians,
   services,
   announcements,
   support,
@@ -56,6 +57,12 @@ const List<_NavItem> _navItems = [
     'Suivi réparations',
     Icons.view_kanban_rounded,
     '/admin/repairs-board',
+  ),
+  _NavItem(
+    AdminSection.technicians,
+    'Techniciens',
+    Icons.engineering_rounded,
+    '/admin/technicians',
   ),
   _NavItem(
     AdminSection.services,

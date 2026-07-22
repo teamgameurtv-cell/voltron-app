@@ -17,7 +17,13 @@ class AdminDashboardScreen extends ConsumerWidget {
     final repairs = ref.watch(repairsProvider);
     final products = ref.watch(catalogProvider);
 
-    final todayBookings = bookings.where((b) => b.day == 'Aujourd\'hui').toList();
+    final activeBookings = bookings.where((b) => !b.archived).toList();
+    final now = DateTime.now();
+    final todayBookings = activeBookings
+        .where(
+          (b) => b.parsedDay != null && isSameBookingDay(b.parsedDay!, now),
+        )
+        .toList();
     final inProgressRepairs = repairs
         .where((r) => r.steps.any((s) => s.status == RepairStepStatus.current))
         .toList();
@@ -55,8 +61,14 @@ class AdminDashboardScreen extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: 28),
-          const Text('RENDEZ-VOUS À VENIR',
-              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: VoltronColors.greyText)),
+          const Text(
+            'RENDEZ-VOUS À VENIR',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: VoltronColors.greyText,
+            ),
+          ),
           const SizedBox(height: 12),
           Container(
             decoration: BoxDecoration(
@@ -64,12 +76,21 @@ class AdminDashboardScreen extends ConsumerWidget {
               borderRadius: BorderRadius.circular(VoltronRadii.md),
             ),
             child: Column(
-              children: bookings.take(5).map((b) => _BookingRow(booking: b)).toList(),
+              children: activeBookings
+                  .take(5)
+                  .map((b) => _BookingRow(booking: b))
+                  .toList(),
             ),
           ),
           const SizedBox(height: 28),
-          const Text('RÉPARATIONS EN COURS',
-              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: VoltronColors.greyText)),
+          const Text(
+            'RÉPARATIONS EN COURS',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: VoltronColors.greyText,
+            ),
+          ),
           const SizedBox(height: 12),
           Container(
             decoration: BoxDecoration(
@@ -92,7 +113,11 @@ class _StatCard extends StatelessWidget {
   final String value;
   final IconData icon;
 
-  const _StatCard({required this.label, required this.value, required this.icon});
+  const _StatCard({
+    required this.label,
+    required this.value,
+    required this.icon,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -108,10 +133,19 @@ class _StatCard extends StatelessWidget {
         children: [
           Icon(icon, color: VoltronColors.electricYellow, size: 22),
           const SizedBox(height: 12),
-          Text(value, style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w900)),
+          Text(
+            value,
+            style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w900),
+          ),
           const SizedBox(height: 4),
-          Text(label,
-              style: const TextStyle(fontSize: 11, color: VoltronColors.greyText, fontWeight: FontWeight.w600)),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 11,
+              color: VoltronColors.greyText,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
         ],
       ),
     );
@@ -140,13 +174,25 @@ class _BookingRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
         children: [
-          SizedBox(width: 56, child: Text(booking.time, style: const TextStyle(fontWeight: FontWeight.w700))),
+          SizedBox(
+            width: 56,
+            child: Text(
+              booking.time,
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+          ),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(booking.serviceName, style: const TextStyle(fontSize: 13)),
-                Text(booking.clientName, style: const TextStyle(color: VoltronColors.greyText, fontSize: 11)),
+                Text(
+                  booking.clientName,
+                  style: const TextStyle(
+                    color: VoltronColors.greyText,
+                    fontSize: 11,
+                  ),
+                ),
               ],
             ),
           ),
@@ -156,7 +202,14 @@ class _BookingRow extends StatelessWidget {
               color: statusColor.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(VoltronRadii.pill),
             ),
-            child: Text(statusLabel, style: TextStyle(color: statusColor, fontSize: 11, fontWeight: FontWeight.w700)),
+            child: Text(
+              statusLabel,
+              style: TextStyle(
+                color: statusColor,
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
           ),
         ],
       ),
@@ -176,10 +229,21 @@ class _RepairRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
         children: [
-          Text('#${order.id}', style: const TextStyle(fontWeight: FontWeight.w700)),
+          Text(
+            '#${order.id}',
+            style: const TextStyle(fontWeight: FontWeight.w700),
+          ),
           const SizedBox(width: 12),
-          Expanded(child: Text(order.scooterName, style: const TextStyle(fontSize: 13))),
-          Text(current.label, style: const TextStyle(color: VoltronColors.warning, fontSize: 12)),
+          Expanded(
+            child: Text(
+              order.scooterName,
+              style: const TextStyle(fontSize: 13),
+            ),
+          ),
+          Text(
+            current.label,
+            style: const TextStyle(color: VoltronColors.warning, fontSize: 12),
+          ),
         ],
       ),
     );

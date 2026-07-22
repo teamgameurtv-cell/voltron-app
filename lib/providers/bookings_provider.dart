@@ -19,6 +19,8 @@ class BookingsNotifier extends StateNotifier<List<Booking>> {
     required String clientName,
     required String day,
     required String time,
+    String problemDescription = '',
+    String scooterName = '',
   }) async {
     final userId = _client.auth.currentUser?.id;
     await _client.from('bookings').insert({
@@ -28,11 +30,17 @@ class BookingsNotifier extends StateNotifier<List<Booking>> {
       'day': day,
       'time': time,
       'status': 'pending',
+      'problem_description': problemDescription,
+      'scooter_name': scooterName,
     });
   }
 
   Future<void> updateStatus(String id, BookingStatus status) async {
     await _client.from('bookings').update({'status': status.name}).eq('id', id);
+  }
+
+  Future<void> setArchived(String id, bool archived) async {
+    await _client.from('bookings').update({'archived': archived}).eq('id', id);
   }
 
   @override

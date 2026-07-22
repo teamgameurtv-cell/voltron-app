@@ -703,6 +703,15 @@ grant execute on function checkout_cart(jsonb, numeric, text, text) to authentic
 -- directement dans Mes informations comme le téléphone.
 alter table profiles add column if not exists address text not null default '';
 
+-- ============ ARCHIVAGE DES RÉSERVATIONS ============
+-- Permet à l'admin de masquer une réservation traitée (client venu, annulée...)
+-- de la liste principale sans la supprimer.
+alter table bookings add column if not exists archived boolean not null default false;
+
+-- ============ DESCRIPTION DU PROBLÈME + VÉHICULE CONCERNÉ (RÉSERVATION) ============
+alter table bookings add column if not exists problem_description text not null default '';
+alter table bookings add column if not exists scooter_name text not null default '';
+
 -- ============ TEMPS RÉEL ============
 -- Sans ça, l'app ne reçoit jamais les mises à jour en direct : il faut
 -- explicitement ajouter chaque table à la publication "supabase_realtime"

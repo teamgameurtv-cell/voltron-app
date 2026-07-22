@@ -18,6 +18,7 @@ dependencies:
   url_launcher: ^6.3.2
   qr_flutter: ^4.1.0
   csv: ^6.0.0
+  table_calendar: ^3.1.2
   # À activer aux sprints suivants (backend réel) :
   # firebase_core: ^3.1.0
   # firebase_messaging: ^15.0.0

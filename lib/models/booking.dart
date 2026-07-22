@@ -35,6 +35,7 @@ DateTime? parseBookingDay(String day) {
 
 class Booking {
   final String id;
+  final String? clientId;
   final String serviceName;
   final String clientName;
   final String day;
@@ -43,9 +44,11 @@ class Booking {
   final bool archived;
   final String problemDescription;
   final String scooterName;
+  final String clientPhone;
 
   const Booking({
     required this.id,
+    this.clientId,
     required this.serviceName,
     required this.clientName,
     required this.day,
@@ -54,11 +57,13 @@ class Booking {
     this.archived = false,
     this.problemDescription = '',
     this.scooterName = '',
+    this.clientPhone = '',
   });
 
   Booking copyWith({BookingStatus? status, bool? archived}) {
     return Booking(
       id: id,
+      clientId: clientId,
       serviceName: serviceName,
       clientName: clientName,
       day: day,
@@ -67,6 +72,7 @@ class Booking {
       archived: archived ?? this.archived,
       problemDescription: problemDescription,
       scooterName: scooterName,
+      clientPhone: clientPhone,
     );
   }
 
@@ -75,6 +81,7 @@ class Booking {
   factory Booking.fromMap(Map<String, dynamic> map) {
     return Booking(
       id: map['id'] as String,
+      clientId: map['client_id'] as String?,
       serviceName: map['service_name'] as String,
       clientName: map['client_name'] as String,
       day: map['day'] as String,
@@ -83,6 +90,7 @@ class Booking {
       archived: map['archived'] as bool? ?? false,
       problemDescription: map['problem_description'] as String? ?? '',
       scooterName: map['scooter_name'] as String? ?? '',
+      clientPhone: map['client_phone'] as String? ?? '',
     );
   }
 }

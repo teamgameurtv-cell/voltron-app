@@ -62,6 +62,9 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
   DateTime? _selectedDay;
   DateTime _visibleMonth = DateTime(DateTime.now().year, DateTime.now().month);
   String? _selectedTime;
+  List<String> _bookedTimes = [];
+  bool _loadingBookedTimes = false;
+  final _firstNameController = TextEditingController();
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
   bool _prefilledFromProfile = false;
@@ -69,6 +72,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
   @override
   void dispose() {
     _problemController.dispose();
+    _firstNameController.dispose();
     _nameController.dispose();
     _phoneController.dispose();
     super.dispose();
@@ -83,13 +87,36 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
         final needsScooterPick = garage.isNotEmpty && _selectedScooter == null;
         return _problemController.text.trim().isNotEmpty && !needsScooterPick;
       case 2:
-        return _selectedDay != null && _selectedTime != null;
+        return _selectedDay != null &&
+            _selectedTime != null &&
+            !_bookedTimes.contains(_selectedTime);
       case 3:
-        return _nameController.text.trim().isNotEmpty &&
+        return _firstNameController.text.trim().isNotEmpty &&
+            _nameController.text.trim().isNotEmpty &&
             _phoneController.text.trim().isNotEmpty;
       default:
         return true;
     }
+  }
+
+  String get _fullName =>
+      '${_firstNameController.text.trim()} ${_nameController.text.trim()}'
+          .trim();
+
+  Future<void> _onDaySelected(DateTime day) async {
+    setState(() {
+      _selectedDay = day;
+      _selectedTime = null;
+      _loadingBookedTimes = true;
+    });
+    final booked = await ref
+        .read(bookingsProvider.notifier)
+        .bookedTimesForDay(_formatDay(day));
+    if (!mounted) return;
+    setState(() {
+      _bookedTimes = booked;
+      _loadingBookedTimes = false;
+    });
   }
 
   Future<void> _next() async {
@@ -100,15 +127,14 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
           .read(bookingsProvider.notifier)
           .add(
             serviceName: _service?.name ?? '-',
-            clientName: _nameController.text.trim().isNotEmpty
-                ? _nameController.text.trim()
-                : 'Client',
+            clientName: _fullName.isNotEmpty ? _fullName : 'Client',
             day: _selectedDay != null ? _formatDay(_selectedDay!) : '-',
             time: _selectedTime ?? '-',
             problemDescription: _problemController.text.trim(),
             scooterName: _selectedScooter != null
                 ? '${_selectedScooter!.brand} ${_selectedScooter!.model}'
                 : '',
+            clientPhone: _phoneController.text.trim(),
           );
       if (!mounted) return;
       context.pop();
@@ -122,7 +148,10 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
   Widget build(BuildContext context) {
     final profile = ref.watch(profileProvider);
     if (!_prefilledFromProfile &&
-        (profile.name.isNotEmpty || profile.phone.isNotEmpty)) {
+        (profile.firstName.isNotEmpty ||
+            profile.name.isNotEmpty ||
+            profile.phone.isNotEmpty)) {
+      _firstNameController.text = profile.firstName;
       _nameController.text = profile.name;
       _phoneController.text = profile.phone;
       _prefilledFromProfile = true;
@@ -187,12 +216,15 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
           visibleMonth: _visibleMonth,
           selectedDay: _selectedDay,
           selectedTime: _selectedTime,
+          bookedTimes: _bookedTimes,
+          loadingBookedTimes: _loadingBookedTimes,
           onMonthChanged: (m) => setState(() => _visibleMonth = m),
-          onDaySelected: (d) => setState(() => _selectedDay = d),
+          onDaySelected: _onDaySelected,
           onTimeSelected: (t) => setState(() => _selectedTime = t),
         );
       case 3:
         return _InfoStep(
+          firstNameController: _firstNameController,
           nameController: _nameController,
           phoneController: _phoneController,
         );
@@ -203,7 +235,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
           scooter: _selectedScooter,
           day: _selectedDay,
           time: _selectedTime,
-          name: _nameController.text,
+          name: _fullName,
         );
     }
   }
@@ -498,6 +530,8 @@ class _DateTimeStep extends StatelessWidget {
   final DateTime visibleMonth;
   final DateTime? selectedDay;
   final String? selectedTime;
+  final List<String> bookedTimes;
+  final bool loadingBookedTimes;
   final ValueChanged<DateTime> onMonthChanged;
   final ValueChanged<DateTime> onDaySelected;
   final ValueChanged<String> onTimeSelected;
@@ -506,6 +540,8 @@ class _DateTimeStep extends StatelessWidget {
     required this.visibleMonth,
     required this.selectedDay,
     required this.selectedTime,
+    required this.bookedTimes,
+    required this.loadingBookedTimes,
     required this.onMonthChanged,
     required this.onDaySelected,
     required this.onTimeSelected,
@@ -636,50 +672,101 @@ class _DateTimeStep extends StatelessWidget {
           },
         ),
         const SizedBox(height: 20),
-        const Text(
-          'Heures disponibles',
-          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
-        ),
-        const SizedBox(height: 12),
-        Wrap(
-          spacing: 10,
-          runSpacing: 10,
-          children: _timeSlots.map((time) {
-            final isSelected = time == selectedTime;
-            return GestureDetector(
-              onTap: () => onTimeSelected(time),
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 18,
-                  vertical: 12,
-                ),
-                decoration: BoxDecoration(
-                  color: isSelected
-                      ? VoltronColors.electricYellow
-                      : VoltronColors.cardBlack,
-                  borderRadius: BorderRadius.circular(VoltronRadii.sm),
-                ),
-                child: Text(
-                  time,
-                  style: TextStyle(
-                    fontWeight: FontWeight.w700,
-                    color: isSelected ? VoltronColors.deepBlack : Colors.white,
-                  ),
+        Row(
+          children: [
+            const Text(
+              'Heures disponibles',
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+            ),
+            if (loadingBookedTimes) ...[
+              const SizedBox(width: 10),
+              const SizedBox(
+                width: 14,
+                height: 14,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: VoltronColors.electricYellow,
                 ),
               ),
-            );
-          }).toList(),
+            ],
+          ],
         ),
+        const SizedBox(height: 12),
+        if (selectedDay == null)
+          const Text(
+            'Choisissez d\'abord une date.',
+            style: TextStyle(color: VoltronColors.greyText, fontSize: 12),
+          )
+        else
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: _timeSlots.map((time) {
+              final isSelected = time == selectedTime;
+              final isTaken = bookedTimes.contains(time);
+              return GestureDetector(
+                onTap: isTaken ? null : () => onTimeSelected(time),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 18,
+                    vertical: 12,
+                  ),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? VoltronColors.electricYellow
+                        : VoltronColors.cardBlack,
+                    borderRadius: BorderRadius.circular(VoltronRadii.sm),
+                    border: isTaken
+                        ? Border.all(
+                            color: VoltronColors.greyText.withValues(
+                              alpha: 0.3,
+                            ),
+                          )
+                        : null,
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        time,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          color: isTaken
+                              ? VoltronColors.greyText.withValues(alpha: 0.5)
+                              : isSelected
+                              ? VoltronColors.deepBlack
+                              : Colors.white,
+                          decoration: isTaken
+                              ? TextDecoration.lineThrough
+                              : null,
+                        ),
+                      ),
+                      if (isTaken)
+                        const Text(
+                          'Complet',
+                          style: TextStyle(
+                            fontSize: 9,
+                            color: VoltronColors.greyText,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
       ],
     );
   }
 }
 
 class _InfoStep extends StatelessWidget {
+  final TextEditingController firstNameController;
   final TextEditingController nameController;
   final TextEditingController phoneController;
 
   const _InfoStep({
+    required this.firstNameController,
     required this.nameController,
     required this.phoneController,
   });
@@ -694,10 +781,23 @@ class _InfoStep extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         TextField(
+          controller: firstNameController,
+          style: const TextStyle(color: Colors.white),
+          decoration: const InputDecoration(
+            hintText: 'Prénom',
+            hintStyle: TextStyle(color: VoltronColors.greyText),
+            prefixIcon: Icon(
+              Icons.person_outline,
+              color: VoltronColors.greyText,
+            ),
+          ),
+        ),
+        const SizedBox(height: 14),
+        TextField(
           controller: nameController,
           style: const TextStyle(color: Colors.white),
           decoration: const InputDecoration(
-            hintText: 'Nom complet',
+            hintText: 'Nom',
             hintStyle: TextStyle(color: VoltronColors.greyText),
             prefixIcon: Icon(
               Icons.person_outline,

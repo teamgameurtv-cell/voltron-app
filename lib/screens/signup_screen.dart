@@ -17,6 +17,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _addressController = TextEditingController();
+  DateTime? _dateOfBirth;
   bool _isLoading = false;
 
   @override
@@ -52,6 +53,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
           email: _emailController.text.trim(),
           password: _passwordController.text,
           address: _addressController.text.trim(),
+          dateOfBirth: _dateOfBirth,
         );
     if (!mounted) return;
     setState(() => _isLoading = false);
@@ -158,6 +160,34 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                   prefixIcon: Icon(
                     Icons.location_on_outlined,
                     color: VoltronColors.greyText,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+              InkWell(
+                onTap: () async {
+                  final picked = await showDatePicker(
+                    context: context,
+                    initialDate: _dateOfBirth ?? DateTime(2000, 1, 1),
+                    firstDate: DateTime(1920),
+                    lastDate: DateTime.now(),
+                  );
+                  if (picked != null) setState(() => _dateOfBirth = picked);
+                },
+                child: InputDecorator(
+                  decoration: InputDecoration(
+                    hintText: 'Date de naissance (optionnel)',
+                    hintStyle: const TextStyle(color: VoltronColors.greyText),
+                    prefixIcon: const Icon(
+                      Icons.cake_outlined,
+                      color: VoltronColors.greyText,
+                    ),
+                  ),
+                  child: Text(
+                    _dateOfBirth != null
+                        ? '${_dateOfBirth!.day.toString().padLeft(2, '0')}/${_dateOfBirth!.month.toString().padLeft(2, '0')}/${_dateOfBirth!.year}'
+                        : '',
+                    style: const TextStyle(color: Colors.white),
                   ),
                 ),
               ),

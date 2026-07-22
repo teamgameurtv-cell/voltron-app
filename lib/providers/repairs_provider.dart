@@ -3,9 +3,15 @@ import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/app_notification.dart';
+import '../models/booking.dart';
 import '../models/repair.dart';
 import 'auth_provider.dart';
 import 'notifications_provider.dart';
+
+String _today() {
+  final now = DateTime.now();
+  return '${now.day} ${bookingMonthNames[now.month - 1]} ${now.year}';
+}
 
 const List<String> repairStepLabels = [
   'Rendez-vous pris',
@@ -102,6 +108,7 @@ class RepairsNotifier extends StateNotifier<List<RepairOrder>> {
             id: o['display_id'] as String,
             scooterName: o['scooter_name'] as String,
             clientId: o['client_id'] as String,
+            archived: o['archived'] as bool? ?? false,
             steps: steps
                 .map(
                   (s) => RepairStep(
@@ -143,7 +150,7 @@ class RepairsNotifier extends StateNotifier<List<RepairOrder>> {
           'order_id': orderRow['id'],
           'label': repairStepLabels[i],
           'status': i == 0 ? 'current' : 'pending',
-          'step_date': i == 0 ? 'Aujourd\'hui' : null,
+          'step_date': i == 0 ? _today() : null,
           'position': i,
           if (i == 0 && note != null && note.trim().isNotEmpty)
             'note': note.trim(),
@@ -158,7 +165,7 @@ class RepairsNotifier extends StateNotifier<List<RepairOrder>> {
     final currentIndex = order.steps.indexWhere(
       (s) => s.status == RepairStepStatus.current,
     );
-    if (currentIndex == -1 || currentIndex >= order.steps.length - 1) return;
+    if (currentIndex == -1) return;
 
     final stepsRows = _steps.where((s) => s['order_id'] == orderDbId).toList()
       ..sort((a, b) => (a['position'] as int).compareTo(b['position'] as int));
@@ -167,18 +174,45 @@ class RepairsNotifier extends StateNotifier<List<RepairOrder>> {
         .from('repair_steps')
         .update({'status': 'done'})
         .eq('id', stepsRows[currentIndex]['id']);
+
+    // Dernière étape validée ("Récupérée") : le dossier est terminé, on
+    // l'archive automatiquement pour qu'il quitte la liste/le kanban actifs.
+    if (currentIndex >= order.steps.length - 1) {
+      await _client
+          .from('repair_orders')
+          .update({'archived': true})
+          .eq('id', orderDbId);
+      ref
+          .read(notificationsProvider.notifier)
+          .notifyClient(
+            order.clientId,
+            type: NotificationType.repair,
+            title: 'Réparation #${order.id}',
+            body: 'Dossier clôturé. Merci de votre confiance !',
+          );
+      return;
+    }
+
     await _client
         .from('repair_steps')
-        .update({'status': 'current', 'step_date': 'Aujourd\'hui'})
+        .update({'status': 'current', 'step_date': _today()})
         .eq('id', stepsRows[currentIndex + 1]['id']);
 
     ref
         .read(notificationsProvider.notifier)
-        .push(
+        .notifyClient(
+          order.clientId,
           type: NotificationType.repair,
           title: 'Réparation #${order.id}',
           body: 'Nouvelle étape : ${order.steps[currentIndex + 1].label}.',
         );
+  }
+
+  Future<void> setArchived(String orderDbId, bool archived) async {
+    await _client
+        .from('repair_orders')
+        .update({'archived': archived})
+        .eq('id', orderDbId);
   }
 
   /// Envoie un devis (lignes détaillées et/ou fichier joint) et fait avancer le
@@ -196,7 +230,7 @@ class RepairsNotifier extends StateNotifier<List<RepairOrder>> {
         .insert({
           'order_id': orderDbId,
           'display_id': displayId,
-          'quote_date': 'Aujourd\'hui',
+          'quote_date': _today(),
           'estimated_delay': estimatedDelay,
           'file_url': fileUrl,
           'status': 'pendingApproval',
@@ -218,7 +252,8 @@ class RepairsNotifier extends StateNotifier<List<RepairOrder>> {
     await advanceStep(orderDbId);
     ref
         .read(notificationsProvider.notifier)
-        .push(
+        .notifyClient(
+          order.clientId,
           type: NotificationType.repair,
           title: 'Réparation #${order.id}',
           body:

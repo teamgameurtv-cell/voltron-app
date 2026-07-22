@@ -15,8 +15,8 @@ class NotificationsNotifier extends StateNotifier<List<AppNotification>> {
         .stream(primaryKey: ['id'])
         .order('created_at', ascending: false)
         .listen((rows) {
-      state = rows.map(AppNotification.fromMap).toList();
-    });
+          state = rows.map(AppNotification.fromMap).toList();
+        });
   }
 
   /// Notification personnelle (le client se l'envoie à lui-même : achat, rappel...).
@@ -29,6 +29,24 @@ class NotificationsNotifier extends StateNotifier<List<AppNotification>> {
     if (userId == null) return;
     await _client.from('notifications').insert({
       'client_id': userId,
+      'type': type.name,
+      'title': title,
+      'body': body,
+    });
+  }
+
+  /// Notification ciblée envoyée par un admin à un client précis (confirmation
+  /// de RDV, avancement de réparation...). Contrairement à [push], qui n'écrit
+  /// que pour l'utilisateur courant, ceci vise explicitement [clientId] — utile
+  /// quand c'est l'admin qui déclenche l'action au nom du client.
+  Future<void> notifyClient(
+    String clientId, {
+    required NotificationType type,
+    required String title,
+    required String body,
+  }) async {
+    await _client.from('notifications').insert({
+      'client_id': clientId,
       'type': type.name,
       'title': title,
       'body': body,
@@ -52,7 +70,10 @@ class NotificationsNotifier extends StateNotifier<List<AppNotification>> {
   Future<void> markAllRead() async {
     final userId = _client.auth.currentUser?.id;
     if (userId == null) return;
-    await _client.from('notifications').update({'read': true}).eq('client_id', userId);
+    await _client
+        .from('notifications')
+        .update({'read': true})
+        .eq('client_id', userId);
   }
 
   Future<void> markRead(String id) async {
@@ -66,9 +87,10 @@ class NotificationsNotifier extends StateNotifier<List<AppNotification>> {
   }
 }
 
-final notificationsProvider = StateNotifierProvider<NotificationsNotifier, List<AppNotification>>(
-  (ref) => NotificationsNotifier(ref.watch(supabaseProvider)),
-);
+final notificationsProvider =
+    StateNotifierProvider<NotificationsNotifier, List<AppNotification>>(
+      (ref) => NotificationsNotifier(ref.watch(supabaseProvider)),
+    );
 
 /// Notifications à afficher au client, en respectant ses préférences
 /// (Compte > Notifications) : un type désactivé disparaît de la liste et du badge.

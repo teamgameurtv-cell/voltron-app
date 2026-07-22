@@ -125,108 +125,119 @@ class AccueilScreen extends ConsumerWidget {
         ? 1.0
         : (loyaltyPoints / nextReward.points).clamp(0.0, 1.0);
 
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(VoltronRadii.lg),
+      child: InkWell(
         borderRadius: BorderRadius.circular(VoltronRadii.lg),
-        gradient: VoltronColors.blueGlow,
-        boxShadow: [
-          BoxShadow(
-            color: VoltronColors.electricBlue.withValues(alpha: 0.3),
-            blurRadius: 24,
-            offset: const Offset(0, 10),
+        onTap: () => context.go('/loyalty'),
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(VoltronRadii.lg),
+            gradient: VoltronColors.blueGlow,
+            boxShadow: [
+              BoxShadow(
+                color: VoltronColors.electricBlue.withValues(alpha: 0.3),
+                blurRadius: 24,
+                offset: const Offset(0, 10),
+              ),
+            ],
           ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'MON SOLDE FIDÉLITÉ',
-                  style: TextStyle(
-                    fontSize: 11,
-                    letterSpacing: 1,
-                    color: Colors.white70,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.baseline,
-                  textBaseline: TextBaseline.alphabetic,
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      '$loyaltyPoints',
-                      style: const TextStyle(
-                        fontSize: 32,
-                        fontWeight: FontWeight.w900,
-                        color: Colors.white,
+                    const Text(
+                      'MON SOLDE FIDÉLITÉ',
+                      style: TextStyle(
+                        fontSize: 11,
+                        letterSpacing: 1,
+                        color: Colors.white70,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
-                    const SizedBox(width: 6),
-                    const Text('pts', style: TextStyle(color: Colors.white70)),
+                    const SizedBox(height: 6),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.baseline,
+                      textBaseline: TextBaseline.alphabetic,
+                      children: [
+                        Text(
+                          '$loyaltyPoints',
+                          style: const TextStyle(
+                            fontSize: 32,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        const Text(
+                          'pts',
+                          style: TextStyle(color: Colors.white70),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      'Voir mes récompenses',
+                      style: TextStyle(
+                        color: VoltronColors.electricYellow,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    OutlinedButton.icon(
+                      onPressed: () => context.push('/loyalty/qr'),
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: Colors.white54),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 8,
+                        ),
+                        minimumSize: Size.zero,
+                      ),
+                      icon: const Icon(Icons.qr_code_2_rounded, size: 16),
+                      label: const Text(
+                        'Voir mon QR code',
+                        style: TextStyle(fontSize: 12),
+                      ),
+                    ),
+                    if (nextReward != null) ...[
+                      const SizedBox(height: 14),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(VoltronRadii.pill),
+                        child: LinearProgressIndicator(
+                          value: progress,
+                          minHeight: 6,
+                          backgroundColor: Colors.white24,
+                          valueColor: const AlwaysStoppedAnimation(
+                            VoltronColors.electricYellow,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Plus que ${nextReward.points - loyaltyPoints} pts pour "${nextReward.label}"',
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
-                const SizedBox(height: 4),
-                GestureDetector(
-                  onTap: () => context.go('/loyalty'),
-                  child: const Text(
-                    'Voir mes récompenses',
-                    style: TextStyle(
-                      color: VoltronColors.electricYellow,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 13,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                OutlinedButton.icon(
-                  onPressed: () => context.push('/loyalty/qr'),
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: Colors.white54),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 8,
-                    ),
-                    minimumSize: Size.zero,
-                  ),
-                  icon: const Icon(Icons.qr_code_2_rounded, size: 16),
-                  label: const Text(
-                    'Voir mon QR code',
-                    style: TextStyle(fontSize: 12),
-                  ),
-                ),
-                if (nextReward != null) ...[
-                  const SizedBox(height: 14),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(VoltronRadii.pill),
-                    child: LinearProgressIndicator(
-                      value: progress,
-                      minHeight: 6,
-                      backgroundColor: Colors.white24,
-                      valueColor: const AlwaysStoppedAnimation(
-                        VoltronColors.electricYellow,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    'Plus que ${nextReward.points - loyaltyPoints} pts pour "${nextReward.label}"',
-                    style: const TextStyle(color: Colors.white70, fontSize: 11),
-                  ),
-                ],
-              ],
-            ),
+              ),
+              const Icon(
+                Icons.bolt_rounded,
+                color: VoltronColors.electricYellow,
+                size: 40,
+              ),
+            ],
           ),
-          const Icon(
-            Icons.bolt_rounded,
-            color: VoltronColors.electricYellow,
-            size: 40,
-          ),
-        ],
+        ),
       ),
     );
   }

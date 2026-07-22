@@ -20,13 +20,14 @@ create table if not exists profiles (
 create or replace function handle_new_user()
 returns trigger as $$
 begin
-  insert into public.profiles (id, name, first_name, email, address)
+  insert into public.profiles (id, name, first_name, email, address, date_of_birth)
   values (
     new.id,
     coalesce(new.raw_user_meta_data->>'name', ''),
     coalesce(new.raw_user_meta_data->>'first_name', ''),
     new.email,
-    coalesce(new.raw_user_meta_data->>'address', '')
+    coalesce(new.raw_user_meta_data->>'address', ''),
+    nullif(new.raw_user_meta_data->>'date_of_birth', '')::date
   )
   on conflict (id) do nothing;
   return new;
@@ -711,6 +712,181 @@ alter table bookings add column if not exists archived boolean not null default 
 -- ============ DESCRIPTION DU PROBLÈME + VÉHICULE CONCERNÉ (RÉSERVATION) ============
 alter table bookings add column if not exists problem_description text not null default '';
 alter table bookings add column if not exists scooter_name text not null default '';
+alter table bookings add column if not exists client_phone text not null default '';
+
+-- ============ CRÉNEAUX DÉJÀ PRIS (empêche un client de réserver un horaire déjà réservé) ============
+-- La RLS limite chaque client à ses propres réservations (bookings_own_or_admin), donc il ne peut
+-- pas voir celles des autres pour vérifier une disponibilité. Cette fonction contourne ça de façon
+-- contrôlée : elle ne renvoie que les horaires déjà pris pour un jour donné, jamais les détails.
+create or replace function get_booked_times(p_day text)
+returns text[]
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select coalesce(array_agg(distinct time), array[]::text[])
+  from bookings
+  where day = p_day and status != 'cancelled';
+$$;
+
+grant execute on function get_booked_times(text) to authenticated;
+
+-- ============ DATE DE NAISSANCE (recherche client admin) ============
+-- Renseignée à l'inscription, non modifiable par le client ensuite : seul
+-- l'admin peut la corriger, depuis la fiche client.
+alter table profiles add column if not exists date_of_birth date;
+
+-- Recherche client (nom, prénom, e-mail, téléphone, date de naissance).
+-- Pas de security definer : la RLS s'applique normalement, donc un client
+-- non-admin n'obtient jamais que sa propre fiche (aucune fuite possible).
+create or replace function search_clients(q text)
+returns setof profiles
+language sql
+stable
+as $$
+  select *
+  from profiles
+  where q = '' or (
+    name ilike '%' || q || '%'
+    or first_name ilike '%' || q || '%'
+    or email ilike '%' || q || '%'
+    or phone ilike '%' || q || '%'
+    or to_char(date_of_birth, 'DD/MM/YYYY') ilike '%' || q || '%'
+  )
+  order by created_at desc
+  limit 30;
+$$;
+
+grant execute on function search_clients(text) to authenticated;
+
+-- ============ FACTURES SAISIES PAR L'ADMIN (achats en magasin) ============
+-- Le client n'a pas le droit d'écrire dans invoices (réservé à checkout_cart
+-- côté boutique app) : ces fonctions permettent à l'admin d'enregistrer un
+-- achat fait en magasin (via SumUp), avec justificatif joint, en créditant
+-- automatiquement les points fidélité (1€ = 1 pt). points_credited retient
+-- combien de points chaque facture a rapporté, pour pouvoir corriger le solde
+-- si l'admin modifie ou supprime la facture ensuite.
+alter table invoices add column if not exists file_url text;
+alter table invoices add column if not exists points_credited int not null default 0;
+
+insert into storage.buckets (id, name, public)
+select 'invoice-files', 'invoice-files', true
+where not exists (select 1 from storage.buckets where id = 'invoice-files');
+
+drop policy if exists "invoice files public read" on storage.objects;
+create policy "invoice files public read" on storage.objects
+  for select using (bucket_id = 'invoice-files');
+
+drop policy if exists "invoice files admin write" on storage.objects;
+create policy "invoice files admin write" on storage.objects
+  for insert with check (bucket_id = 'invoice-files' and is_admin());
+
+drop policy if exists "invoice files admin update" on storage.objects;
+create policy "invoice files admin update" on storage.objects
+  for update using (bucket_id = 'invoice-files' and is_admin());
+
+drop policy if exists "invoice files admin delete" on storage.objects;
+create policy "invoice files admin delete" on storage.objects
+  for delete using (bucket_id = 'invoice-files' and is_admin());
+
+create or replace function admin_add_invoice(
+  p_client_id uuid, p_label text, p_invoice_date text, p_amount numeric, p_file_url text
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_points int;
+  v_id uuid;
+begin
+  if not is_admin() then
+    raise exception 'Réservé aux administrateurs';
+  end if;
+
+  v_points := floor(p_amount)::int;
+
+  insert into invoices (client_id, label, invoice_date, amount, file_url, points_credited)
+  values (p_client_id, p_label, p_invoice_date, p_amount, p_file_url, v_points)
+  returning id into v_id;
+
+  update profiles set loyalty_points = loyalty_points + v_points where id = p_client_id;
+
+  return v_id;
+end;
+$$;
+
+grant execute on function admin_add_invoice(uuid, text, text, numeric, text) to authenticated;
+
+create or replace function admin_update_invoice(
+  p_invoice_id uuid, p_label text, p_invoice_date text, p_amount numeric, p_file_url text
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_client_id uuid;
+  v_old_points int;
+  v_new_points int;
+begin
+  if not is_admin() then
+    raise exception 'Réservé aux administrateurs';
+  end if;
+
+  select client_id, points_credited into v_client_id, v_old_points from invoices where id = p_invoice_id;
+  if v_client_id is null then
+    raise exception 'Facture introuvable';
+  end if;
+
+  v_new_points := floor(p_amount)::int;
+
+  update invoices
+  set label = p_label, invoice_date = p_invoice_date, amount = p_amount, file_url = p_file_url, points_credited = v_new_points
+  where id = p_invoice_id;
+
+  update profiles
+  set loyalty_points = greatest(0, loyalty_points - v_old_points + v_new_points)
+  where id = v_client_id;
+end;
+$$;
+
+grant execute on function admin_update_invoice(uuid, text, text, numeric, text) to authenticated;
+
+create or replace function admin_delete_invoice(p_invoice_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_client_id uuid;
+  v_points int;
+begin
+  if not is_admin() then
+    raise exception 'Réservé aux administrateurs';
+  end if;
+
+  select client_id, points_credited into v_client_id, v_points from invoices where id = p_invoice_id;
+  if v_client_id is null then
+    raise exception 'Facture introuvable';
+  end if;
+
+  delete from invoices where id = p_invoice_id;
+
+  update profiles set loyalty_points = greatest(0, loyalty_points - v_points) where id = v_client_id;
+end;
+$$;
+
+grant execute on function admin_delete_invoice(uuid) to authenticated;
+
+-- ============ ARCHIVAGE DES DOSSIERS DE RÉPARATION ============
+-- Un dossier passe automatiquement ici une fois la dernière étape ("Récupérée")
+-- validée, pour ne plus encombrer la liste/le kanban actifs.
+alter table repair_orders add column if not exists archived boolean not null default false;
 
 -- ============ TEMPS RÉEL ============
 -- Sans ça, l'app ne reçoit jamais les mises à jour en direct : il faut

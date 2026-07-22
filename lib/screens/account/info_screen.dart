@@ -41,6 +41,7 @@ class _InfoScreenState extends ConsumerState<InfoScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final dateOfBirth = ref.watch(profileProvider).dateOfBirth;
     return Scaffold(
       backgroundColor: VoltronColors.deepBlack,
       appBar: AppBar(
@@ -98,6 +99,53 @@ class _InfoScreenState extends ConsumerState<InfoScreen> {
                 decoration: const InputDecoration(
                   hintText: 'Adresse',
                   hintStyle: TextStyle(color: VoltronColors.greyText),
+                ),
+              ),
+              const SizedBox(height: 14),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 18,
+                  vertical: 16,
+                ),
+                decoration: BoxDecoration(
+                  color: VoltronColors.cardBlack.withValues(alpha: 0.5),
+                  borderRadius: BorderRadius.circular(VoltronRadii.md),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.cake_outlined,
+                      size: 18,
+                      color: VoltronColors.greyText,
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Date de naissance',
+                            style: TextStyle(
+                              color: VoltronColors.greyText,
+                              fontSize: 11,
+                            ),
+                          ),
+                          Text(
+                            dateOfBirth != null
+                                ? '${dateOfBirth.day.toString().padLeft(2, '0')}/${dateOfBirth.month.toString().padLeft(2, '0')}/${dateOfBirth.year}'
+                                : 'Non renseignée',
+                            style: const TextStyle(color: Colors.white),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Icon(
+                      Icons.lock_outline,
+                      size: 16,
+                      color: VoltronColors.greyText,
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(height: 20),

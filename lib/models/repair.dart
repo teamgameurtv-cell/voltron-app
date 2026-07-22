@@ -105,6 +105,7 @@ class RepairOrder {
   final List<RepairStep> steps;
   final Quote? quote;
   final String clientId;
+  final bool archived;
 
   const RepairOrder({
     required this.dbId,
@@ -113,14 +114,20 @@ class RepairOrder {
     required this.steps,
     this.quote,
     required this.clientId,
+    this.archived = false,
   });
 
-  RepairStep get currentStep =>
-      steps.firstWhere((s) => s.status == RepairStepStatus.current, orElse: () => steps.last);
+  RepairStep get currentStep => steps.firstWhere(
+    (s) => s.status == RepairStepStatus.current,
+    orElse: () => steps.last,
+  );
 
-  bool get isComplete => steps.isNotEmpty && steps.last.status == RepairStepStatus.done;
+  bool get isComplete =>
+      steps.isNotEmpty && steps.last.status == RepairStepStatus.done;
 
   /// L'étape "Devis envoyé" bloque tant que le devis n'est pas accepté.
   bool get isBlockedOnQuote =>
-      currentStep.label == 'Devis envoyé' && quote != null && quote!.status != QuoteStatus.accepted;
+      currentStep.label == 'Devis envoyé' &&
+      quote != null &&
+      quote!.status != QuoteStatus.accepted;
 }

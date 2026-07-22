@@ -4,6 +4,7 @@ class UserProfile {
   final String email;
   final String phone;
   final String address;
+  final DateTime? dateOfBirth;
   final int loyaltyPoints;
   final String? avatarUrl;
   final List<String> quickShortcuts;
@@ -17,6 +18,7 @@ class UserProfile {
     required this.email,
     required this.phone,
     this.address = '',
+    this.dateOfBirth,
     this.loyaltyPoints = 0,
     this.avatarUrl,
     this.quickShortcuts = const ['book', 'shop', 'garage', 'care'],
@@ -43,6 +45,7 @@ class UserProfile {
       email: email ?? this.email,
       phone: phone ?? this.phone,
       address: address ?? this.address,
+      dateOfBirth: dateOfBirth,
       loyaltyPoints: loyaltyPoints,
       avatarUrl: avatarUrl ?? this.avatarUrl,
       quickShortcuts: quickShortcuts ?? this.quickShortcuts,
@@ -59,6 +62,9 @@ class UserProfile {
       email: map['email'] as String? ?? '',
       phone: map['phone'] as String? ?? '',
       address: map['address'] as String? ?? '',
+      dateOfBirth: map['date_of_birth'] != null
+          ? DateTime.tryParse(map['date_of_birth'] as String)
+          : null,
       loyaltyPoints: map['loyalty_points'] as int? ?? 0,
       avatarUrl: map['avatar_url'] as String?,
       quickShortcuts:
@@ -99,12 +105,16 @@ class Invoice {
   final String date;
   final String label;
   final double amount;
+  final String? fileUrl;
+  final int pointsCredited;
 
   const Invoice({
     required this.id,
     required this.date,
     required this.label,
     required this.amount,
+    this.fileUrl,
+    this.pointsCredited = 0,
   });
 
   factory Invoice.fromMap(Map<String, dynamic> map) {
@@ -113,6 +123,8 @@ class Invoice {
       date: map['invoice_date'] as String,
       label: map['label'] as String,
       amount: (map['amount'] as num).toDouble(),
+      fileUrl: map['file_url'] as String?,
+      pointsCredited: map['points_credited'] as int? ?? 0,
     );
   }
 }

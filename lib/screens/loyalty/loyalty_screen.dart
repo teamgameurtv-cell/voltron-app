@@ -59,6 +59,13 @@ const List<_LoyaltyGoal> _loyaltyGoals = [
     icon: Icons.location_on_outlined,
   ),
   _LoyaltyGoal(
+    id: 'birthdate_added',
+    title: 'Renseigne ta date de naissance',
+    subtitle: 'À l\'inscription, pour en profiter',
+    points: 15,
+    icon: Icons.cake_outlined,
+  ),
+  _LoyaltyGoal(
     id: 'vehicle_added',
     title: 'Enregistre un véhicule',
     subtitle: 'Ajoute ta trottinette dans Mon Garage',
@@ -102,6 +109,8 @@ class LoyaltyScreen extends ConsumerWidget {
         return (ref.watch(profileProvider).avatarUrl ?? '').isNotEmpty;
       case 'address_added':
         return ref.watch(profileProvider).address.trim().isNotEmpty;
+      case 'birthdate_added':
+        return ref.watch(profileProvider).dateOfBirth != null;
       case 'vehicle_added':
         return ref.watch(garageProvider).isNotEmpty;
       case 'first_purchase':

@@ -40,12 +40,19 @@ class AuthNotifier {
     required String name,
     required String firstName,
     String address = '',
+    DateTime? dateOfBirth,
   }) async {
     try {
       await _client.auth.signUp(
         email: email,
         password: password,
-        data: {'name': name, 'first_name': firstName, 'address': address},
+        data: {
+          'name': name,
+          'first_name': firstName,
+          'address': address,
+          'date_of_birth':
+              dateOfBirth?.toIso8601String().split('T').first ?? '',
+        },
       );
       return null;
     } on AuthException catch (e) {

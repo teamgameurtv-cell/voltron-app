@@ -1,9 +1,11 @@
 import '../models/repair_step_task.dart';
 
 /// Modèle de checklist à semer pour chaque étape à la création d'un dossier,
-/// exactement comme les 8 [repairStepLabels] le sont déjà aujourd'hui. Seule
-/// "Trottinette déposée" a une checklist détaillée pour l'instant ; les autres
-/// étapes ont une simple tâche "Notes/Observations" par défaut.
+/// exactement comme les 8 [repairStepLabels] le sont déjà aujourd'hui.
+/// "Trottinette déposée" et "Diagnostic en cours" ont une checklist détaillée ;
+/// les autres étapes ont une simple tâche "Notes/Observations" par défaut.
+/// Les tâches "note" et "counter" (photos) sont visibles du client une fois
+/// renseignées (voir `client_repair_order_detail.dart`).
 class RepairStepTaskTemplate {
   final RepairStepTaskKind kind;
   final String label;
@@ -51,6 +53,17 @@ const Map<String, List<RepairStepTaskTemplate>> repairStepTaskTemplates = {
       label: 'Notes/Observations',
     ),
   ],
+  'Diagnostic en cours': [
+    RepairStepTaskTemplate(
+      kind: RepairStepTaskKind.note,
+      label: 'Résultat du diagnostic',
+    ),
+    RepairStepTaskTemplate(
+      kind: RepairStepTaskKind.counter,
+      label: 'Photos du diagnostic',
+      counterTarget: 4,
+    ),
+  ],
 };
 
 /// Accessoires courants proposés dans le sélecteur — liste fermée volontairement
@@ -62,6 +75,18 @@ const List<String> commonAccessories = [
   'Sacoche',
   'Housse',
   'Clé',
+];
+
+/// Checklist rapide de vérification au dépôt (freins, accélération...), dans
+/// l'ordre — semée une fois pour tout le dossier, visible du client une fois
+/// cochée. (clé, libellé)
+const List<(String, String)> dropoffCheckTemplate = [
+  ('freins', 'Freins'),
+  ('acceleration', 'Accélération'),
+  ('etat_general', 'État général de la trottinette'),
+  ('serrage', 'Serrage'),
+  ('led', 'Éclairage / LED'),
+  ('pression_pneus', 'Pression des pneus'),
 ];
 
 List<RepairStepTaskTemplate> templateForStep(String stepLabel) =>

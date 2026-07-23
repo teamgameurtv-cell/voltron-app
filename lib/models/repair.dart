@@ -82,6 +82,7 @@ class Quote {
   final String estimatedDelay;
   final QuoteStatus status;
   final String? fileUrl;
+  final String? note;
 
   const Quote({
     required this.dbId,
@@ -91,6 +92,7 @@ class Quote {
     required this.estimatedDelay,
     this.status = QuoteStatus.pendingApproval,
     this.fileUrl,
+    this.note,
   });
 
   double get total => lines.fold(0, (sum, l) => sum + l.price);
@@ -117,6 +119,7 @@ class RepairOrder {
   final String? appointmentTime;
   final String arrivalCondition;
   final String? dropoffReportUrl;
+  final String? dropoffClientNote;
 
   const RepairOrder({
     required this.dbId,
@@ -133,6 +136,7 @@ class RepairOrder {
     this.appointmentTime,
     this.arrivalCondition = 'À compléter',
     this.dropoffReportUrl,
+    this.dropoffClientNote,
   });
 
   RepairStep get currentStep => steps.firstWhere(

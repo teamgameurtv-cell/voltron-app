@@ -481,6 +481,9 @@ grant execute on function claim_loyalty_goal(text, int) to authenticated;
 -- ============ DEVIS : notes d'étape + pièce jointe ============
 alter table repair_steps add column if not exists note text;
 alter table quotes add column if not exists file_url text;
+-- Explication du devis (pourquoi telle pièce, tel tarif...), visible par le
+-- client sur son écran de devis — distincte des lignes de prix elles-mêmes.
+alter table quotes add column if not exists note text;
 
 insert into storage.buckets (id, name, public)
 select 'quote-files', 'quote-files', true
@@ -1250,6 +1253,32 @@ alter table client_internal_notes enable row level security;
 drop policy if exists "client_internal_notes_admin_only" on client_internal_notes;
 create policy "client_internal_notes_admin_only" on client_internal_notes for all using (is_admin()) with check (is_admin());
 
+-- ============ VÉRIFICATION RAPIDE AU DÉPÔT ============
+-- Checklist fixe, dans l'ordre, cochée par l'admin à la prise en charge du
+-- véhicule — contrairement à repair_order_step_tasks (propre à l'étape en
+-- cours), celle-ci est rattachée au dossier entier et reste visible du
+-- client une fois cochée, quelle que soit l'étape atteinte ensuite.
+alter table repair_orders add column if not exists dropoff_client_note text;
+
+create table if not exists repair_order_dropoff_checks (
+  id uuid primary key default gen_random_uuid(),
+  order_id uuid not null references repair_orders(id) on delete cascade,
+  key text not null,
+  label text not null,
+  position int not null default 0,
+  done boolean not null default false,
+  updated_at timestamptz not null default now(),
+  unique (order_id, key)
+);
+alter table repair_order_dropoff_checks enable row level security;
+
+drop policy if exists "repair_order_dropoff_checks_own_or_admin" on repair_order_dropoff_checks;
+create policy "repair_order_dropoff_checks_own_or_admin" on repair_order_dropoff_checks for select using (
+  exists (select 1 from repair_orders o where o.id = order_id and (o.client_id = auth.uid() or is_admin()))
+);
+drop policy if exists "repair_order_dropoff_checks_write_admin" on repair_order_dropoff_checks;
+create policy "repair_order_dropoff_checks_write_admin" on repair_order_dropoff_checks for all using (is_admin()) with check (is_admin());
+
 -- ============ TEMPS RÉEL ============
 -- Sans ça, l'app ne reçoit jamais les mises à jour en direct : il faut
 -- explicitement ajouter chaque table à la publication "supabase_realtime"
@@ -1266,7 +1295,7 @@ begin
     'reward_redemptions', 'support_tickets', 'support_messages',
     'technicians', 'repair_order_step_tasks', 'repair_order_photos',
     'repair_order_documents', 'repair_order_parts', 'repair_order_messages',
-    'repair_order_events', 'client_internal_notes'
+    'repair_order_events', 'client_internal_notes', 'repair_order_dropoff_checks'
   ]
   loop
     if not exists (

@@ -7,12 +7,14 @@ import '../../data/repair_step_task_templates.dart';
 import '../../models/repair.dart';
 import '../../models/repair_order_part.dart';
 import '../../models/repair_step_task.dart';
+import '../../models/scooter.dart';
 import '../../models/technician.dart';
 import '../../providers/admin_crm_provider.dart';
 import '../../providers/repair_order_detail_provider.dart';
 import '../../providers/repairs_provider.dart';
 import '../../providers/technicians_provider.dart';
 import '../../theme/voltron_theme.dart';
+import '../../widgets/care_badge.dart';
 import '../../widgets/repair_order_card.dart' show showQuoteDialog;
 import '../../widgets/repair_step_tracker.dart';
 
@@ -82,6 +84,8 @@ class AdminRepairOrderScreen extends ConsumerWidget {
                       Expanded(child: _TechnicianCard(order: order)),
                     ],
                   ),
+                  const SizedBox(height: 12),
+                  _DropoffChecklistCard(order: order),
                   const SizedBox(height: 20),
                   _CurrentStepChecklist(order: order),
                 ],
@@ -262,9 +266,38 @@ class _VehicleCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final scooter = order.scooterId != null
-        ? ref.watch(scooterByIdProvider(order.scooterId!)).valueOrNull
-        : null;
+    final clientScooters =
+        ref.watch(clientScootersProvider(order.clientId)).valueOrNull ?? [];
+
+    OwnedScooter? scooter;
+    if (order.scooterId != null) {
+      scooter = ref.watch(scooterByIdProvider(order.scooterId!)).valueOrNull;
+    } else {
+      // Dossiers créés avant la liaison véhicule : on retrouve le véhicule
+      // correspondant chez ce client (par nom, sinon véhicule unique) et on
+      // fixe le lien définitivement pour ne plus avoir à le refaire.
+      final query = order.scooterName.toLowerCase();
+      final matches = clientScooters
+          .where(
+            (s) =>
+                query.contains(s.model.toLowerCase()) ||
+                query.contains(s.brand.toLowerCase()),
+          )
+          .toList();
+      if (matches.length == 1) {
+        scooter = matches.first;
+      } else if (clientScooters.length == 1) {
+        scooter = clientScooters.first;
+      }
+      if (scooter != null) {
+        final resolvedId = scooter.id;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          ref
+              .read(repairOrderDetailActionsProvider)
+              .linkScooter(order.dbId, resolvedId);
+        });
+      }
+    }
 
     return _cardWrapper(
       'TROTTINETTE',
@@ -272,22 +305,68 @@ class _VehicleCard extends ConsumerWidget {
       Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            scooter != null
-                ? '${scooter.brand} ${scooter.model}'
-                : order.scooterName,
-            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
-          ),
-          if (scooter != null) ...[
-            if (scooter.serialNumber.isNotEmpty)
-              Text(
-                'N° ${scooter.serialNumber}',
-                style: const TextStyle(
-                  color: VoltronColors.greyText,
-                  fontSize: 11,
+          if (scooter != null)
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: VoltronColors.deepBlack,
+                    borderRadius: BorderRadius.circular(VoltronRadii.sm),
+                  ),
+                  child:
+                      (scooter.imageUrl != null && scooter.imageUrl!.isNotEmpty)
+                      ? ClipRRect(
+                          borderRadius: BorderRadius.circular(VoltronRadii.sm),
+                          child: Image.network(
+                            scooter.imageUrl!,
+                            width: 48,
+                            height: 48,
+                            fit: BoxFit.cover,
+                          ),
+                        )
+                      : const Icon(
+                          Icons.electric_scooter_rounded,
+                          color: VoltronColors.electricYellow,
+                          size: 22,
+                        ),
                 ),
-              ),
-            const SizedBox(height: 4),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${scooter.brand} ${scooter.model}',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13,
+                        ),
+                      ),
+                      if (scooter.serialNumber.isNotEmpty)
+                        Text(
+                          'N° ${scooter.serialNumber}',
+                          style: const TextStyle(
+                            color: VoltronColors.electricYellow,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            )
+          else
+            Text(
+              order.scooterName,
+              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+            ),
+          if (scooter != null) ...[
+            const SizedBox(height: 6),
             Text(
               '${scooter.mileageKm} km',
               style: const TextStyle(fontSize: 11),
@@ -316,10 +395,73 @@ class _VehicleCard extends ConsumerWidget {
               ),
             ),
           ),
+          if (clientScooters.isNotEmpty)
+            GestureDetector(
+              onTap: () =>
+                  _showLinkScooterDialog(context, ref, order, clientScooters),
+              child: Text(
+                scooter != null ? 'Changer de véhicule' : 'Lier un véhicule',
+                style: const TextStyle(
+                  color: VoltronColors.electricBlueGlow,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
         ],
       ),
     );
   }
+}
+
+void _showLinkScooterDialog(
+  BuildContext context,
+  WidgetRef ref,
+  RepairOrder order,
+  List<OwnedScooter> scooters,
+) {
+  showDialog(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      backgroundColor: VoltronColors.cardBlack,
+      title: const Text('Lier un véhicule'),
+      content: SizedBox(
+        width: 320,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: scooters
+              .map(
+                (s) => RadioListTile<String?>(
+                  value: s.id,
+                  groupValue: order.scooterId,
+                  activeColor: VoltronColors.electricYellow,
+                  title: Text(
+                    '${s.brand} ${s.model}',
+                    style: const TextStyle(fontSize: 13),
+                  ),
+                  subtitle: Text(
+                    'N° ${s.serialNumber}',
+                    style: const TextStyle(fontSize: 11),
+                  ),
+                  onChanged: (value) {
+                    ref
+                        .read(repairOrderDetailActionsProvider)
+                        .linkScooter(order.dbId, value);
+                    Navigator.of(dialogContext).pop();
+                  },
+                ),
+              )
+              .toList(),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(dialogContext).pop(),
+          child: const Text('Fermer'),
+        ),
+      ],
+    ),
+  );
 }
 
 class _ClientCard extends ConsumerWidget {
@@ -333,6 +475,9 @@ class _ClientCard extends ConsumerWidget {
     final notes =
         ref.watch(clientInternalNotesProvider(order.clientId)).valueOrNull ??
         '';
+    final plan = ref
+        .watch(clientSubscriptionProvider(order.clientId))
+        .valueOrNull;
 
     return _cardWrapper(
       'CLIENT',
@@ -340,9 +485,23 @@ class _ClientCard extends ConsumerWidget {
       Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            client?.fullName ?? '…',
-            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+          Row(
+            children: [
+              Flexible(
+                child: Text(
+                  client?.fullName ?? '…',
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+              if (plan != null) ...[
+                const SizedBox(width: 6),
+                CareBadge(plan: plan),
+              ],
+            ],
           ),
           if ((client?.phone ?? '').isNotEmpty)
             Text(client!.phone, style: const TextStyle(fontSize: 11)),
@@ -767,19 +926,219 @@ void _showAssignTechnicianDialog(
   );
 }
 
-class _CurrentStepChecklist extends ConsumerWidget {
+/// Checklist rapide, fixe et ordonnée, cochée à la prise en charge du
+/// véhicule (freins, accélération, état général, serrage, LED, pression des
+/// pneus) — reste visible du client une fois cochée, quelle que soit l'étape
+/// atteinte ensuite (contrairement à la checklist de l'étape en cours).
+class _DropoffChecklistCard extends ConsumerStatefulWidget {
+  final RepairOrder order;
+
+  const _DropoffChecklistCard({required this.order});
+
+  @override
+  ConsumerState<_DropoffChecklistCard> createState() =>
+      _DropoffChecklistCardState();
+}
+
+class _DropoffChecklistCardState extends ConsumerState<_DropoffChecklistCard> {
+  bool _seedTriggered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final checksAsync = ref.watch(dropoffChecksProvider(widget.order.dbId));
+    final checks = checksAsync.valueOrNull ?? [];
+
+    // Dossiers créés avant cette fonctionnalité : on sème la checklist une
+    // fois, à la première consultation.
+    if (checksAsync.hasValue && checks.isEmpty && !_seedTriggered) {
+      _seedTriggered = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ref
+            .read(repairOrderDetailActionsProvider)
+            .ensureDropoffChecks(widget.order.dbId);
+      });
+    }
+
+    final note = widget.order.dropoffClientNote ?? '';
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: VoltronColors.cardBlack,
+        borderRadius: BorderRadius.circular(VoltronRadii.md),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(
+                Icons.fact_check_outlined,
+                size: 14,
+                color: VoltronColors.electricYellow,
+              ),
+              SizedBox(width: 6),
+              Text(
+                'VÉRIFICATION AU DÉPÔT',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.5,
+                  color: VoltronColors.greyText,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          ...checks.map(
+            (check) => InkWell(
+              onTap: () => ref
+                  .read(repairOrderDetailActionsProvider)
+                  .toggleDropoffCheck(check.id, !check.done),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  children: [
+                    Icon(
+                      check.done
+                          ? Icons.check_circle_rounded
+                          : Icons.radio_button_unchecked_rounded,
+                      size: 18,
+                      color: check.done
+                          ? VoltronColors.success
+                          : VoltronColors.greyText,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        check.label,
+                        style: TextStyle(
+                          fontSize: 13,
+                          decoration: check.done
+                              ? TextDecoration.lineThrough
+                              : null,
+                          color: check.done
+                              ? VoltronColors.greyText
+                              : Colors.white,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 6),
+          if (note.trim().isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Text(
+                note,
+                style: const TextStyle(
+                  color: VoltronColors.electricBlueGlow,
+                  fontSize: 12,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ),
+          TextButton.icon(
+            onPressed: () => _editDropoffClientNote(context, ref, widget.order),
+            icon: const Icon(Icons.edit_note_rounded, size: 16),
+            label: Text(
+              note.trim().isEmpty
+                  ? 'Ajouter une note visible par le client'
+                  : 'Modifier la note client',
+              style: const TextStyle(fontSize: 12),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+void _editDropoffClientNote(
+  BuildContext context,
+  WidgetRef ref,
+  RepairOrder order,
+) {
+  final controller = TextEditingController(text: order.dropoffClientNote ?? '');
+  showDialog(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      backgroundColor: VoltronColors.cardBlack,
+      title: const Text('Note visible par le client'),
+      content: SizedBox(
+        width: 340,
+        child: TextField(
+          controller: controller,
+          autofocus: true,
+          maxLines: 4,
+          decoration: const InputDecoration(
+            hintText:
+                'Ex : Trottinette en bon état général, pneu avant un peu usé...',
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(dialogContext).pop(),
+          child: const Text('Annuler'),
+        ),
+        ElevatedButton(
+          onPressed: () {
+            ref
+                .read(repairOrderDetailActionsProvider)
+                .updateDropoffClientNote(order.dbId, controller.text.trim());
+            Navigator.of(dialogContext).pop();
+          },
+          child: const Text('ENREGISTRER'),
+        ),
+      ],
+    ),
+  );
+}
+
+class _CurrentStepChecklist extends ConsumerStatefulWidget {
   final RepairOrder order;
 
   const _CurrentStepChecklist({required this.order});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final tasks = ref.watch(stepTasksProvider(order.dbId)).valueOrNull ?? [];
+  ConsumerState<_CurrentStepChecklist> createState() =>
+      _CurrentStepChecklistState();
+}
+
+class _CurrentStepChecklistState extends ConsumerState<_CurrentStepChecklist> {
+  String? _seededForStepId;
+
+  @override
+  Widget build(BuildContext context) {
+    final order = widget.order;
+    final tasksAsync = ref.watch(stepTasksProvider(order.dbId));
+    final tasks = tasksAsync.valueOrNull ?? [];
     final photos =
         ref.watch(repairOrderPhotosProvider(order.dbId)).valueOrNull ?? [];
     final currentStepId = order.currentStep.id;
     final currentTasks = tasks.where((t) => t.stepId == currentStepId).toList()
       ..sort((a, b) => a.position.compareTo(b.position));
+
+    // Étapes créées avant qu'un modèle de checklist n'existe pour elles (ex.
+    // "Diagnostic en cours" avant son ajout) : on sème une fois par étape.
+    if (tasksAsync.hasValue &&
+        currentTasks.isEmpty &&
+        _seededForStepId != currentStepId) {
+      _seededForStepId = currentStepId;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ref
+            .read(repairOrderDetailActionsProvider)
+            .ensureStepTasks(
+              order.dbId,
+              currentStepId,
+              order.currentStep.label,
+            );
+      });
+    }
 
     return Container(
       padding: const EdgeInsets.all(14),

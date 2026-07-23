@@ -2,11 +2,14 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/repair.dart';
+import '../providers/admin_crm_provider.dart';
 import '../providers/repairs_provider.dart';
 import '../theme/voltron_theme.dart';
 
-/// Carte détaillée d'un dossier de réparation (statut, devis, notes d'étape),
-/// utilisée à la fois dans la liste "Réparations" et dans le détail du kanban.
+/// Ligne compacte d'un dossier dans la liste "Réparations" : client, véhicule
+/// et étape en cours en un coup d'œil — le détail complet (frise, devis,
+/// checklist, historique...) vit dans l'écran dédié ouvert au tap
+/// (voir admin_repair_order_screen.dart), donc pas d'action ici.
 class RepairOrderCard extends ConsumerWidget {
   final RepairOrder order;
 
@@ -14,219 +17,92 @@ class RepairOrderCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isComplete = order.steps.last.status == RepairStepStatus.done;
-    final atQuoteStep = order.currentStep.label == 'Diagnostic en cours';
+    final client = ref.watch(clientByIdProvider(order.clientId)).valueOrNull;
+    final isComplete = order.isComplete;
+    final badgeColor = isComplete
+        ? VoltronColors.success
+        : order.isBlockedOnQuote
+        ? VoltronColors.warning
+        : VoltronColors.electricBlueGlow;
+    final badgeLabel = isComplete ? 'Terminée' : order.currentStep.label;
+    final subtitle = [
+      client?.fullName,
+      order.scooterName,
+    ].where((s) => (s ?? '').trim().isNotEmpty).join(' · ');
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
         color: VoltronColors.cardBlack,
         borderRadius: BorderRadius.circular(VoltronRadii.md),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Text(
+          Container(
+            width: 40,
+            height: 40,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: VoltronColors.deepBlack,
+              borderRadius: BorderRadius.circular(VoltronRadii.sm),
+            ),
+            child: const Icon(
+              Icons.electric_scooter_rounded,
+              color: VoltronColors.electricYellow,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
                   'Dossier #${order.id}',
                   style: const TextStyle(
                     fontWeight: FontWeight.w800,
-                    fontSize: 15,
+                    fontSize: 14,
                   ),
                 ),
-              ),
-              if (order.quote != null)
-                TextButton.icon(
-                  onPressed: () => showQuoteDialog(
-                    context,
-                    ref,
-                    order,
-                    existing: order.quote,
-                  ),
-                  icon: const Icon(Icons.edit_outlined, size: 14),
-                  label: const Text(
-                    'MODIFIER LE DEVIS',
-                    style: TextStyle(fontSize: 11),
-                  ),
-                ),
-              if (!isComplete && order.isBlockedOnQuote)
-                ElevatedButton(
-                  onPressed: () => ref
-                      .read(repairsProvider.notifier)
-                      .acceptQuote(order.dbId),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: VoltronColors.electricBlue,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 8,
+                if (subtitle.isNotEmpty)
+                  Text(
+                    subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: VoltronColors.greyText,
+                      fontSize: 12,
                     ),
                   ),
-                  child: const Text(
-                    'VALIDER LE DEVIS (client)',
-                    style: TextStyle(fontSize: 11),
-                  ),
-                )
-              else if (!isComplete && atQuoteStep)
-                ElevatedButton(
-                  onPressed: () => showQuoteDialog(context, ref, order),
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 8,
-                    ),
-                  ),
-                  child: const Text(
-                    'ENVOYER LE DEVIS',
-                    style: TextStyle(fontSize: 11),
-                  ),
-                )
-              else if (!isComplete)
-                ElevatedButton(
-                  onPressed: () => ref
-                      .read(repairsProvider.notifier)
-                      .advanceStep(order.dbId),
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 8,
-                    ),
-                  ),
-                  child: const Text(
-                    'ÉTAPE SUIVANTE',
-                    style: TextStyle(fontSize: 11),
-                  ),
-                )
-              else
-                const Text(
-                  'TERMINÉ',
-                  style: TextStyle(
-                    color: VoltronColors.success,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-            ],
+              ],
+            ),
           ),
-          if (!isComplete && order.isBlockedOnQuote)
-            const Padding(
-              padding: EdgeInsets.only(top: 4),
-              child: Text(
-                'En attente de validation du devis par le client',
-                style: TextStyle(color: VoltronColors.warning, fontSize: 11),
+          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              color: badgeColor.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(VoltronRadii.pill),
+            ),
+            child: Text(
+              badgeLabel,
+              style: TextStyle(
+                color: badgeColor,
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
               ),
             ),
-          Text(
-            order.scooterName,
-            style: const TextStyle(color: VoltronColors.greyText, fontSize: 12),
           ),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: order.steps.map((step) {
-              Color color;
-              switch (step.status) {
-                case RepairStepStatus.done:
-                  color = VoltronColors.success;
-                  break;
-                case RepairStepStatus.current:
-                  color = VoltronColors.warning;
-                  break;
-                case RepairStepStatus.pending:
-                  color = VoltronColors.greyText;
-                  break;
-              }
-              final hasNote = (step.note ?? '').isNotEmpty;
-              return GestureDetector(
-                onTap: () => showStepNoteDialog(context, ref, step),
-                child: Tooltip(
-                  message: hasNote ? step.note! : 'Ajouter une note',
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: color.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(VoltronRadii.pill),
-                      border: hasNote ? Border.all(color: color) : null,
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          step.label,
-                          style: TextStyle(
-                            color: color,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        if (hasNote) ...[
-                          const SizedBox(width: 4),
-                          Icon(
-                            Icons.sticky_note_2_outlined,
-                            size: 12,
-                            color: color,
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                ),
-              );
-            }).toList(),
+          const SizedBox(width: 4),
+          const Icon(
+            Icons.chevron_right_rounded,
+            color: VoltronColors.greyText,
+            size: 20,
           ),
         ],
       ),
     );
   }
-}
-
-/// Note d'étape (visible aussi depuis l'écran détail du dossier) — réutilisée
-/// telle quelle plutôt que dupliquée.
-void showStepNoteDialog(BuildContext context, WidgetRef ref, RepairStep step) {
-  final controller = TextEditingController(text: step.note ?? '');
-  showDialog(
-    context: context,
-    builder: (dialogContext) => AlertDialog(
-      backgroundColor: VoltronColors.cardBlack,
-      title: Text('Note — ${step.label}'),
-      content: SizedBox(
-        width: 360,
-        child: TextField(
-          controller: controller,
-          maxLines: 4,
-          decoration: const InputDecoration(
-            hintText: 'Note interne ou visible par le client',
-          ),
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(dialogContext).pop(),
-          child: const Text('Annuler'),
-        ),
-        ElevatedButton(
-          onPressed: () {
-            ref
-                .read(repairsProvider.notifier)
-                .updateStepNote(
-                  step.id,
-                  controller.text.trim().isEmpty
-                      ? null
-                      : controller.text.trim(),
-                );
-            Navigator.of(dialogContext).pop();
-          },
-          child: const Text('ENREGISTRER'),
-        ),
-      ],
-    ),
-  );
 }
 
 void showQuoteDialog(
@@ -248,6 +124,7 @@ void showQuoteDialog(
     else
       (TextEditingController(), TextEditingController()),
   ];
+  final noteController = TextEditingController(text: existing?.note ?? '');
   String? fileUrl = existing?.fileUrl;
   bool isUploading = false;
 
@@ -328,6 +205,25 @@ void showQuoteDialog(
                   ),
                   icon: const Icon(Icons.add, size: 16),
                   label: const Text('Ajouter une ligne'),
+                ),
+                const SizedBox(height: 10),
+                const Text(
+                  'EXPLICATION (visible par le client)',
+                  style: TextStyle(
+                    fontSize: 11,
+                    letterSpacing: 1,
+                    color: VoltronColors.greyText,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: noteController,
+                  maxLines: 3,
+                  decoration: const InputDecoration(
+                    hintText:
+                        'Ex : la batterie est défaillante et doit être remplacée...',
+                  ),
                 ),
                 const SizedBox(height: 10),
                 const Text(
@@ -430,6 +326,9 @@ void showQuoteDialog(
                             lines: quoteLines,
                             estimatedDelay: delayController.text.trim(),
                             fileUrl: fileUrl,
+                            note: noteController.text.trim().isEmpty
+                                ? null
+                                : noteController.text.trim(),
                           );
                     } else {
                       ref
@@ -439,6 +338,9 @@ void showQuoteDialog(
                             lines: quoteLines,
                             estimatedDelay: delayController.text.trim(),
                             fileUrl: fileUrl,
+                            note: noteController.text.trim().isEmpty
+                                ? null
+                                : noteController.text.trim(),
                           );
                     }
                     Navigator.of(dialogContext).pop();

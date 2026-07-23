@@ -1,12 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../models/repair.dart';
+import '../models/repair_order_dropoff_check.dart';
+import '../models/repair_order_photo.dart';
+import '../models/repair_step_task.dart';
+import '../providers/repair_order_detail_provider.dart';
 import '../theme/voltron_theme.dart';
 
 /// Détail complet d'un dossier de réparation côté client : étapes, notes, devis.
 /// Si [collapsible] est vrai, seul l'en-tête (numéro, véhicule, étape en cours)
 /// est visible tant qu'on ne tape pas dessus pour déplier le reste.
-class ClientRepairOrderDetail extends StatelessWidget {
+class ClientRepairOrderDetail extends ConsumerWidget {
   final RepairOrder order;
   final bool collapsible;
 
@@ -17,12 +22,19 @@ class ClientRepairOrderDetail extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final checks =
+        ref.watch(dropoffChecksProvider(order.dbId)).valueOrNull ?? [];
     final content = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        ...order.steps.map((step) => _TimelineTile(step: step)),
+        if (checks.isNotEmpty ||
+            (order.dropoffClientNote ?? '').trim().isNotEmpty)
+          _DropoffCheckSummary(checks: checks, note: order.dropoffClientNote),
+        ...order.steps.map(
+          (step) => _TimelineTile(orderId: order.dbId, step: step),
+        ),
         const SizedBox(height: 8),
         if (order.quote != null)
           ElevatedButton(
@@ -121,13 +133,14 @@ class ClientRepairOrderDetail extends StatelessWidget {
   }
 }
 
-class _TimelineTile extends StatelessWidget {
+class _TimelineTile extends ConsumerWidget {
+  final String orderId;
   final RepairStep step;
 
-  const _TimelineTile({required this.step});
+  const _TimelineTile({required this.orderId, required this.step});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     Color color;
     IconData icon;
     switch (step.status) {
@@ -144,6 +157,30 @@ class _TimelineTile extends StatelessWidget {
         icon = Icons.radio_button_unchecked_rounded;
         break;
     }
+
+    // Notes/photos détaillées de cette étape (ex. résultat + photos du
+    // diagnostic), en plus de la simple note d'étape existante ci-dessous.
+    final tasks = ref
+        .watch(stepTasksProvider(orderId))
+        .valueOrNull
+        ?.where((t) => t.stepId == step.id)
+        .toList();
+    final noteTasks = (tasks ?? [])
+        .where(
+          (t) =>
+              t.kind == RepairStepTaskKind.note &&
+              (t.valueText ?? '').trim().isNotEmpty,
+        )
+        .toList();
+    final photoTaskIds = (tasks ?? [])
+        .where((t) => t.kind == RepairStepTaskKind.counter)
+        .map((t) => t.id)
+        .toSet();
+    final photos = photoTaskIds.isEmpty
+        ? const <RepairOrderPhoto>[]
+        : (ref.watch(repairOrderPhotosProvider(orderId)).valueOrNull ?? [])
+              .where((p) => photoTaskIds.contains(p.stepTaskId))
+              .toList();
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
@@ -193,9 +230,124 @@ class _TimelineTile extends StatelessWidget {
                       ),
                     ),
                   ),
+                ...noteTasks.map(
+                  (t) => Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(
+                      '${t.label} : ${t.valueText}',
+                      style: const TextStyle(
+                        color: VoltronColors.electricBlueGlow,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                ),
+                if (photos.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: SizedBox(
+                      height: 56,
+                      child: ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: photos.length,
+                        separatorBuilder: (_, __) => const SizedBox(width: 6),
+                        itemBuilder: (context, index) => ClipRRect(
+                          borderRadius: BorderRadius.circular(VoltronRadii.sm),
+                          child: Image.network(
+                            photos[index].url,
+                            width: 56,
+                            height: 56,
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Résumé, côté client, de la vérification rapide faite au dépôt — les
+/// éléments cochés par l'admin (freins, accélération...) et la note qu'il a
+/// éventuellement laissée à ce sujet.
+class _DropoffCheckSummary extends StatelessWidget {
+  final List<RepairOrderDropoffCheck> checks;
+  final String? note;
+
+  const _DropoffCheckSummary({required this.checks, this.note});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: VoltronColors.deepBlack,
+        borderRadius: BorderRadius.circular(VoltronRadii.sm),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'VÉRIFICATION À LA PRISE EN CHARGE',
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0.5,
+              color: VoltronColors.greyText,
+            ),
+          ),
+          if (checks.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 12,
+              runSpacing: 6,
+              children: checks
+                  .map(
+                    (check) => Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          check.done
+                              ? Icons.check_circle_rounded
+                              : Icons.radio_button_unchecked_rounded,
+                          size: 14,
+                          color: check.done
+                              ? VoltronColors.success
+                              : VoltronColors.greyText,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          check.label,
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: check.done
+                                ? Colors.white
+                                : VoltronColors.greyText,
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                  .toList(),
+            ),
+          ],
+          if ((note ?? '').trim().isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              note!.trim(),
+              style: const TextStyle(
+                color: VoltronColors.electricBlueGlow,
+                fontSize: 12,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ],
         ],
       ),
     );

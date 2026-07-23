@@ -102,6 +102,7 @@ class RepairsNotifier extends StateNotifier<List<RepairOrder>> {
               estimatedDelay: quoteMap['estimated_delay'] as String? ?? '',
               status: QuoteStatus.values.byName(quoteMap['status'] as String),
               fileUrl: quoteMap['file_url'] as String?,
+              note: quoteMap['note'] as String?,
               lines: lines,
             );
           }
@@ -119,6 +120,7 @@ class RepairsNotifier extends StateNotifier<List<RepairOrder>> {
             arrivalCondition:
                 o['arrival_condition'] as String? ?? 'À compléter',
             dropoffReportUrl: o['dropoff_report_url'] as String?,
+            dropoffClientNote: o['dropoff_client_note'] as String?,
             steps: steps
                 .map(
                   (s) => RepairStep(
@@ -197,6 +199,17 @@ class RepairsNotifier extends StateNotifier<List<RepairOrder>> {
     if (taskRows.isNotEmpty) {
       await _client.from('repair_order_step_tasks').insert(taskRows);
     }
+
+    // Sème la checklist fixe de vérification au dépôt (freins, accélération...).
+    await _client.from('repair_order_dropoff_checks').insert([
+      for (var i = 0; i < dropoffCheckTemplate.length; i++)
+        {
+          'order_id': orderRow['id'],
+          'key': dropoffCheckTemplate[i].$1,
+          'label': dropoffCheckTemplate[i].$2,
+          'position': i,
+        },
+    ]);
 
     await logRepairOrderEvent(
       _client,
@@ -293,6 +306,7 @@ class RepairsNotifier extends StateNotifier<List<RepairOrder>> {
     required List<QuoteLine> lines,
     required String estimatedDelay,
     String? fileUrl,
+    String? note,
   }) async {
     final order = state.firstWhere((o) => o.dbId == orderDbId);
     final displayId = '${1000 + DateTime.now().millisecond}';
@@ -304,6 +318,7 @@ class RepairsNotifier extends StateNotifier<List<RepairOrder>> {
           'quote_date': _today(),
           'estimated_delay': estimatedDelay,
           'file_url': fileUrl,
+          'note': note,
           'status': 'pendingApproval',
         })
         .select()
@@ -345,10 +360,15 @@ class RepairsNotifier extends StateNotifier<List<RepairOrder>> {
     required List<QuoteLine> lines,
     required String estimatedDelay,
     String? fileUrl,
+    String? note,
   }) async {
     await _client
         .from('quotes')
-        .update({'estimated_delay': estimatedDelay, 'file_url': fileUrl})
+        .update({
+          'estimated_delay': estimatedDelay,
+          'file_url': fileUrl,
+          'note': note,
+        })
         .eq('id', quoteDbId);
 
     await _client.from('quote_lines').delete().eq('quote_id', quoteDbId);

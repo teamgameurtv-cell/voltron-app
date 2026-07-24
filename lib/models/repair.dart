@@ -132,6 +132,7 @@ class RepairOrder {
   final String arrivalCondition;
   final String? dropoffReportUrl;
   final String? dropoffClientNote;
+  final DateTime createdAt;
 
   const RepairOrder({
     required this.dbId,
@@ -149,6 +150,7 @@ class RepairOrder {
     this.arrivalCondition = 'À compléter',
     this.dropoffReportUrl,
     this.dropoffClientNote,
+    required this.createdAt,
   });
 
   RepairStep get currentStep => steps.firstWhere(

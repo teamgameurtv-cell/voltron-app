@@ -12,14 +12,41 @@ import '../../widgets/client_avatar.dart';
 import '../../widgets/repair_order_card.dart';
 import 'admin_shell.dart';
 
-class AdminRepairsScreen extends ConsumerWidget {
+class AdminRepairsScreen extends ConsumerStatefulWidget {
   const AdminRepairsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<AdminRepairsScreen> createState() => _AdminRepairsScreenState();
+}
+
+class _AdminRepairsScreenState extends ConsumerState<AdminRepairsScreen> {
+  final _searchController = TextEditingController();
+  String _query = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  bool _matches(RepairOrder order, String query) {
+    if (query.isEmpty) return true;
+    if (order.id.toLowerCase().contains(query)) return true;
+    if (order.scooterName.toLowerCase().contains(query)) return true;
+    final client = ref.watch(clientByIdProvider(order.clientId)).valueOrNull;
+    return client != null && client.fullName.toLowerCase().contains(query);
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final allRepairs = ref.watch(repairsProvider);
-    final activeRepairs = allRepairs.where((o) => !o.archived).toList();
-    final archivedRepairs = allRepairs.where((o) => o.archived).toList();
+    final query = _query.trim().toLowerCase();
+    final activeRepairs = allRepairs
+        .where((o) => !o.archived && _matches(o, query))
+        .toList();
+    final archivedRepairs = allRepairs
+        .where((o) => o.archived && _matches(o, query))
+        .toList();
 
     return AdminShell(
       selected: AdminSection.repairs,
@@ -34,10 +61,21 @@ class AdminRepairsScreen extends ConsumerWidget {
       ),
       child: ListView(
         children: [
+          TextField(
+            controller: _searchController,
+            onChanged: (v) => setState(() => _query = v),
+            decoration: const InputDecoration(
+              hintText: 'Rechercher un dossier (n°, client, véhicule)...',
+              prefixIcon: Icon(Icons.search_rounded),
+            ),
+          ),
+          const SizedBox(height: 16),
           if (activeRepairs.isEmpty)
-            const Text(
-              'Aucun dossier en cours.',
-              style: TextStyle(color: VoltronColors.greyText),
+            Text(
+              query.isEmpty
+                  ? 'Aucun dossier en cours.'
+                  : 'Aucun dossier ne correspond à cette recherche.',
+              style: const TextStyle(color: VoltronColors.greyText),
             )
           else
             ...activeRepairs.map(

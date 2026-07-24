@@ -2,6 +2,7 @@ import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../models/account_models.dart';
 import '../../models/booking.dart';
@@ -17,7 +18,7 @@ import '../../providers/support_provider.dart';
 import '../../theme/voltron_theme.dart';
 import '../../widgets/care_badge.dart';
 import '../../widgets/client_avatar.dart';
-import '../../widgets/client_repair_order_detail.dart';
+import '../../widgets/repair_order_card.dart';
 import '../../widgets/support_chat_thread.dart';
 import 'admin_shell.dart';
 
@@ -519,7 +520,10 @@ class _ClientDetail extends ConsumerWidget {
             ...clientRepairs.map(
               (order) => Padding(
                 padding: const EdgeInsets.only(bottom: 10),
-                child: ClientRepairOrderDetail(order: order, collapsible: true),
+                child: GestureDetector(
+                  onTap: () => context.push('/admin/repairs/${order.dbId}'),
+                  child: RepairOrderCard(order: order),
+                ),
               ),
             ),
             const SizedBox(height: 24),
@@ -1195,9 +1199,12 @@ class _ClientDetail extends ConsumerWidget {
                               ...orders.map(
                                 (o) => Padding(
                                   padding: const EdgeInsets.only(bottom: 10),
-                                  child: ClientRepairOrderDetail(
-                                    order: o,
-                                    collapsible: true,
+                                  child: GestureDetector(
+                                    onTap: () {
+                                      Navigator.of(context).pop();
+                                      context.push('/admin/repairs/${o.dbId}');
+                                    },
+                                    child: RepairOrderCard(order: o),
                                   ),
                                 ),
                               ),

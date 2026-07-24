@@ -132,6 +132,7 @@ class RepairsNotifier extends StateNotifier<List<RepairOrder>> {
                 o['arrival_condition'] as String? ?? 'À compléter',
             dropoffReportUrl: o['dropoff_report_url'] as String?,
             dropoffClientNote: o['dropoff_client_note'] as String?,
+            createdAt: DateTime.parse(o['created_at'] as String),
             steps: steps
                 .map(
                   (s) => RepairStep(

@@ -1,12 +1,24 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../models/booking.dart';
 import '../models/repair.dart';
 import '../models/repair_order_message.dart';
+import '../models/technician.dart';
 import '../providers/admin_crm_provider.dart';
 import '../providers/repair_order_detail_provider.dart';
 import '../providers/repairs_provider.dart';
+import '../providers/technicians_provider.dart';
 import '../theme/voltron_theme.dart';
+
+/// Date + heure de création du dossier ("24 Juillet 2026 à 09:45"), dans le
+/// même style que les créneaux affichés pour les réservations.
+String formatOrderDateTime(DateTime dt) {
+  final local = dt.toLocal();
+  final hh = local.hour.toString().padLeft(2, '0');
+  final mm = local.minute.toString().padLeft(2, '0');
+  return '${local.day} ${bookingMonthNames[local.month - 1]} ${local.year} à $hh:$mm';
+}
 
 /// Ligne compacte d'un dossier dans la liste "Réparations" : client, véhicule
 /// et étape en cours en un coup d'œil — le détail complet (frise, devis,
@@ -20,6 +32,16 @@ class RepairOrderCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final client = ref.watch(clientByIdProvider(order.clientId)).valueOrNull;
+    Technician? technician;
+    if (order.technicianId != null) {
+      final technicians = ref.watch(techniciansProvider).valueOrNull ?? [];
+      for (final t in technicians) {
+        if (t.id == order.technicianId) {
+          technician = t;
+          break;
+        }
+      }
+    }
     final hasUnreadMessage =
         ref.watch(
           unreadRepairMessagesCountProvider((
@@ -113,6 +135,17 @@ class RepairOrderCard extends ConsumerWidget {
                       fontSize: 12,
                     ),
                   ),
+                Text(
+                  technician != null
+                      ? '${formatOrderDateTime(order.createdAt)} · ${technician.name}'
+                      : formatOrderDateTime(order.createdAt),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: VoltronColors.greyText,
+                    fontSize: 11,
+                  ),
+                ),
               ],
             ),
           ),

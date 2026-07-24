@@ -73,6 +73,10 @@ class QuoteLine {
 
 enum QuoteStatus { pendingApproval, accepted, refused }
 
+enum DepositStatus { none, pending, paid }
+
+enum DepositMethod { online, inStore }
+
 class Quote {
   /// Identifiant Supabase (uuid) de la table quotes.
   final String dbId;
@@ -83,6 +87,10 @@ class Quote {
   final QuoteStatus status;
   final String? fileUrl;
   final String? note;
+  final double? depositAmount;
+  final DepositStatus depositStatus;
+  final DepositMethod? depositMethod;
+  final String? depositPaidAt;
 
   const Quote({
     required this.dbId,
@@ -93,6 +101,10 @@ class Quote {
     this.status = QuoteStatus.pendingApproval,
     this.fileUrl,
     this.note,
+    this.depositAmount,
+    this.depositStatus = DepositStatus.none,
+    this.depositMethod,
+    this.depositPaidAt,
   });
 
   double get total => lines.fold(0, (sum, l) => sum + l.price);

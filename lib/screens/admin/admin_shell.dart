@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../providers/admin_notifications_provider.dart';
 import '../../theme/voltron_theme.dart';
 
 enum AdminSection {
@@ -157,6 +159,37 @@ class AdminShell extends StatelessWidget {
                               fontWeight: FontWeight.w800,
                             ),
                           ),
+                        ),
+                        Consumer(
+                          builder: (context, ref, _) {
+                            final unread = ref.watch(
+                              unreadAdminNotificationsCountProvider,
+                            );
+                            return Stack(
+                              children: [
+                                IconButton(
+                                  onPressed: () =>
+                                      context.push('/admin/notifications'),
+                                  icon: const Icon(
+                                    Icons.notifications_none_rounded,
+                                  ),
+                                ),
+                                if (unread > 0)
+                                  Positioned(
+                                    right: 8,
+                                    top: 8,
+                                    child: Container(
+                                      width: 8,
+                                      height: 8,
+                                      decoration: const BoxDecoration(
+                                        color: VoltronColors.electricYellow,
+                                        shape: BoxShape.circle,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            );
+                          },
                         ),
                         if (actions != null) actions!,
                       ],

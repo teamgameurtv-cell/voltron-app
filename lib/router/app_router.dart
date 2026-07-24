@@ -13,6 +13,7 @@ import '../screens/shop/cart_screen.dart';
 import '../screens/repairs/repairs_screen.dart';
 import '../screens/repairs/booking_screen.dart';
 import '../screens/repairs/quote_screen.dart';
+import '../screens/repairs/deposit_payment_screen.dart';
 import '../screens/loyalty/loyalty_screen.dart';
 import '../screens/loyalty/voltron_care_screen.dart';
 import '../screens/loyalty/care_payment_screen.dart';
@@ -40,6 +41,7 @@ import '../screens/admin/admin_services_screen.dart';
 import '../screens/admin/admin_support_screen.dart';
 import '../screens/admin/admin_vehicle_lookup_screen.dart';
 import '../screens/admin/admin_technicians_screen.dart';
+import '../screens/admin/admin_notifications_screen.dart';
 import '../screens/admin/admin_repair_order_screen.dart';
 import '../screens/repairs/repair_order_messages_screen.dart';
 import '../models/repair_order_message.dart';
@@ -117,6 +119,13 @@ final GoRouter appRouter = GoRouter(
                   builder: (context, state) => RepairOrderMessagesScreen(
                     orderId: state.pathParameters['orderId']!,
                     myRole: RepairMessageSenderRole.client,
+                  ),
+                ),
+                GoRoute(
+                  path: 'deposit/:orderId',
+                  parentNavigatorKey: rootNavigatorKey,
+                  builder: (context, state) => DepositPaymentScreen(
+                    orderId: state.pathParameters['orderId']!,
                   ),
                 ),
               ],
@@ -268,6 +277,11 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: '/admin/technicians',
       builder: (context, state) => const AdminTechniciansScreen(),
+    ),
+    GoRoute(
+      path: '/admin/notifications',
+      parentNavigatorKey: rootNavigatorKey,
+      builder: (context, state) => const AdminNotificationsScreen(),
     ),
     GoRoute(
       path: '/admin/repairs/:orderId',

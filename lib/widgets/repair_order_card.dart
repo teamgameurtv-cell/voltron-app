@@ -125,6 +125,11 @@ void showQuoteDialog(
       (TextEditingController(), TextEditingController()),
   ];
   final noteController = TextEditingController(text: existing?.note ?? '');
+  final depositController = TextEditingController(
+    text: existing?.depositAmount != null && existing!.depositAmount! > 0
+        ? existing.depositAmount!.toStringAsFixed(2)
+        : '',
+  );
   String? fileUrl = existing?.fileUrl;
   bool isUploading = false;
 
@@ -227,6 +232,27 @@ void showQuoteDialog(
                 ),
                 const SizedBox(height: 10),
                 const Text(
+                  'ACOMPTE (facultatif)',
+                  style: TextStyle(
+                    fontSize: 11,
+                    letterSpacing: 1,
+                    color: VoltronColors.greyText,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: depositController,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  decoration: const InputDecoration(
+                    hintText: 'Montant en € à demander avant intervention',
+                    prefixIcon: Icon(Icons.euro_rounded, size: 16),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                const Text(
                   'PIÈCE JOINTE (facultatif)',
                   style: TextStyle(
                     fontSize: 11,
@@ -318,6 +344,9 @@ void showQuoteDialog(
                           ),
                         )
                         .toList();
+                    final depositAmount = double.tryParse(
+                      depositController.text.trim().replaceAll(',', '.'),
+                    );
                     if (existing == null) {
                       ref
                           .read(repairsProvider.notifier)
@@ -329,6 +358,7 @@ void showQuoteDialog(
                             note: noteController.text.trim().isEmpty
                                 ? null
                                 : noteController.text.trim(),
+                            depositAmount: depositAmount,
                           );
                     } else {
                       ref
@@ -341,6 +371,7 @@ void showQuoteDialog(
                             note: noteController.text.trim().isEmpty
                                 ? null
                                 : noteController.text.trim(),
+                            depositAmount: depositAmount,
                           );
                     }
                     Navigator.of(dialogContext).pop();

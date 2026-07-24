@@ -1279,6 +1279,39 @@ create policy "repair_order_dropoff_checks_own_or_admin" on repair_order_dropoff
 drop policy if exists "repair_order_dropoff_checks_write_admin" on repair_order_dropoff_checks;
 create policy "repair_order_dropoff_checks_write_admin" on repair_order_dropoff_checks for all using (is_admin()) with check (is_admin());
 
+-- ============ ACOMPTE SUR DEVIS ============
+-- 'none' = pas d'acompte demandé, 'pending' = demandé mais pas encore payé,
+-- 'paid' = réglé (en ligne, simulé comme le reste des paiements de l'app, ou
+-- en magasin — l'admin le marque alors lui-même comme reçu).
+alter table quotes add column if not exists deposit_amount numeric(10,2);
+alter table quotes add column if not exists deposit_status text not null default 'none' check (deposit_status in ('none','pending','paid'));
+alter table quotes add column if not exists deposit_method text check (deposit_method in ('online','in_store'));
+alter table quotes add column if not exists deposit_paid_at timestamptz;
+
+-- ============ NOTIFICATIONS ADMIN ============
+-- La table "notifications" ne cible que des clients (client_id) ou une
+-- diffusion globale ; il n'existe aucun moyen de viser l'admin. On sépare
+-- donc une table dédiée, lue uniquement par l'admin, mais qu'un client peut
+-- alimenter pour ses propres actions (ex : paiement d'acompte).
+create table if not exists admin_notifications (
+  id uuid primary key default gen_random_uuid(),
+  title text not null,
+  body text not null,
+  order_id uuid references repair_orders(id) on delete cascade,
+  read boolean not null default false,
+  created_at timestamptz not null default now()
+);
+alter table admin_notifications enable row level security;
+
+drop policy if exists "admin_notifications_select_admin" on admin_notifications;
+create policy "admin_notifications_select_admin" on admin_notifications for select using (is_admin());
+drop policy if exists "admin_notifications_update_admin" on admin_notifications;
+create policy "admin_notifications_update_admin" on admin_notifications for update using (is_admin()) with check (is_admin());
+drop policy if exists "admin_notifications_insert" on admin_notifications;
+create policy "admin_notifications_insert" on admin_notifications for insert with check (
+  is_admin() or exists (select 1 from repair_orders o where o.id = order_id and o.client_id = auth.uid())
+);
+
 -- ============ TEMPS RÉEL ============
 -- Sans ça, l'app ne reçoit jamais les mises à jour en direct : il faut
 -- explicitement ajouter chaque table à la publication "supabase_realtime"
@@ -1295,7 +1328,8 @@ begin
     'reward_redemptions', 'support_tickets', 'support_messages',
     'technicians', 'repair_order_step_tasks', 'repair_order_photos',
     'repair_order_documents', 'repair_order_parts', 'repair_order_messages',
-    'repair_order_events', 'client_internal_notes', 'repair_order_dropoff_checks'
+    'repair_order_events', 'client_internal_notes', 'repair_order_dropoff_checks',
+    'admin_notifications'
   ]
   loop
     if not exists (

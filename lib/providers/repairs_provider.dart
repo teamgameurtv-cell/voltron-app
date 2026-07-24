@@ -6,6 +6,7 @@ import '../data/repair_step_task_templates.dart';
 import '../models/app_notification.dart';
 import '../models/booking.dart';
 import '../models/repair.dart';
+import 'admin_notifications_provider.dart';
 import 'auth_provider.dart';
 import 'notifications_provider.dart';
 import 'repair_order_events_log.dart';
@@ -104,6 +105,16 @@ class RepairsNotifier extends StateNotifier<List<RepairOrder>> {
               fileUrl: quoteMap['file_url'] as String?,
               note: quoteMap['note'] as String?,
               lines: lines,
+              depositAmount: (quoteMap['deposit_amount'] as num?)?.toDouble(),
+              depositStatus: DepositStatus.values.byName(
+                quoteMap['deposit_status'] as String? ?? 'none',
+              ),
+              depositMethod: switch (quoteMap['deposit_method'] as String?) {
+                'online' => DepositMethod.online,
+                'in_store' => DepositMethod.inStore,
+                _ => null,
+              },
+              depositPaidAt: quoteMap['deposit_paid_at'] as String?,
             );
           }
           return RepairOrder(
@@ -307,6 +318,7 @@ class RepairsNotifier extends StateNotifier<List<RepairOrder>> {
     required String estimatedDelay,
     String? fileUrl,
     String? note,
+    double? depositAmount,
   }) async {
     final order = state.firstWhere((o) => o.dbId == orderDbId);
     final displayId = '${1000 + DateTime.now().millisecond}';
@@ -320,6 +332,8 @@ class RepairsNotifier extends StateNotifier<List<RepairOrder>> {
           'file_url': fileUrl,
           'note': note,
           'status': 'pendingApproval',
+          'deposit_amount': depositAmount,
+          'deposit_status': (depositAmount ?? 0) > 0 ? 'pending' : 'none',
         })
         .select()
         .single();
@@ -361,13 +375,26 @@ class RepairsNotifier extends StateNotifier<List<RepairOrder>> {
     required String estimatedDelay,
     String? fileUrl,
     String? note,
+    double? depositAmount,
   }) async {
+    // Un acompte déjà payé ne doit pas repasser "en attente" si l'admin
+    // modifie juste le devis ensuite (délai, pièce jointe...).
+    final existingQuote = state
+        .map((o) => o.quote)
+        .whereType<Quote>()
+        .where((q) => q.dbId == quoteDbId)
+        .firstOrNull;
+    final alreadyPaid = existingQuote?.depositStatus == DepositStatus.paid;
     await _client
         .from('quotes')
         .update({
           'estimated_delay': estimatedDelay,
           'file_url': fileUrl,
           'note': note,
+          'deposit_amount': depositAmount,
+          'deposit_status': (depositAmount ?? 0) <= 0
+              ? 'none'
+              : (alreadyPaid ? 'paid' : 'pending'),
         })
         .eq('id', quoteDbId);
 
@@ -426,6 +453,79 @@ class RepairsNotifier extends StateNotifier<List<RepairOrder>> {
       actorRole: 'client',
       eventType: 'quote_refused',
       description: 'Devis refusé par le client',
+    );
+  }
+
+  /// Le client paie l'acompte directement dans l'app (paiement simulé, comme
+  /// Voltron Care) : marqué payé immédiatement et l'admin en est informé.
+  Future<void> payDepositOnline(String orderDbId) async {
+    final order = state.firstWhere((o) => o.dbId == orderDbId);
+    final quote = order.quote;
+    if (quote == null) return;
+    await _client
+        .from('quotes')
+        .update({
+          'deposit_status': 'paid',
+          'deposit_method': 'online',
+          'deposit_paid_at': DateTime.now().toIso8601String(),
+        })
+        .eq('id', quote.dbId);
+    await logRepairOrderEvent(
+      _client,
+      orderId: orderDbId,
+      actorRole: 'client',
+      eventType: 'deposit_paid',
+      description:
+          'Acompte de ${quote.depositAmount?.toStringAsFixed(2)} € payé en ligne',
+    );
+    await notifyAdmin(
+      _client,
+      orderId: orderDbId,
+      title: 'Acompte payé — Dossier #${order.id}',
+      body:
+          '${quote.depositAmount?.toStringAsFixed(2)} € réglés en ligne par le client.',
+    );
+  }
+
+  /// Le client choisit de régler l'acompte en boutique : l'admin devra le
+  /// marquer comme reçu une fois le paiement effectué en magasin.
+  Future<void> chooseDepositInStore(String orderDbId) async {
+    final order = state.firstWhere((o) => o.dbId == orderDbId);
+    final quote = order.quote;
+    if (quote == null) return;
+    await _client
+        .from('quotes')
+        .update({'deposit_method': 'in_store'})
+        .eq('id', quote.dbId);
+    await logRepairOrderEvent(
+      _client,
+      orderId: orderDbId,
+      actorRole: 'client',
+      eventType: 'deposit_choice_in_store',
+      description: 'Le client réglera l\'acompte en boutique',
+    );
+  }
+
+  /// Action admin : encaissement de l'acompte constaté en magasin.
+  Future<void> markDepositPaidInStore(String orderDbId) async {
+    final order = state.firstWhere((o) => o.dbId == orderDbId);
+    final quote = order.quote;
+    if (quote == null) return;
+    await _client
+        .from('quotes')
+        .update({
+          'deposit_status': 'paid',
+          'deposit_method': 'in_store',
+          'deposit_paid_at': DateTime.now().toIso8601String(),
+        })
+        .eq('id', quote.dbId);
+    await logRepairOrderEvent(
+      _client,
+      orderId: orderDbId,
+      actorRole: 'admin',
+      eventType: 'deposit_paid',
+      description:
+          'Acompte de ${quote.depositAmount?.toStringAsFixed(2)} € encaissé en magasin',
     );
   }
 

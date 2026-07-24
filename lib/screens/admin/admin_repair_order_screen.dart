@@ -66,6 +66,31 @@ class AdminRepairOrderScreen extends ConsumerWidget {
                 padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
                 children: [
                   RepairStepTracker(steps: order.steps),
+                  if (order.quote?.status == QuoteStatus.accepted) ...[
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.check_circle_rounded,
+                          size: 14,
+                          color: VoltronColors.success,
+                        ),
+                        const SizedBox(width: 6),
+                        const Text(
+                          'Le client a validé le devis',
+                          style: TextStyle(
+                            color: VoltronColors.success,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                  if ((order.quote?.depositAmount ?? 0) > 0) ...[
+                    const SizedBox(height: 8),
+                    _DepositBanner(order: order),
+                  ],
                   const SizedBox(height: 24),
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -223,6 +248,74 @@ class _PrimaryActionButton extends ConsumerWidget {
       onPressed: () =>
           ref.read(repairsProvider.notifier).advanceStep(order.dbId),
       child: const Text('ÉTAPE SUIVANTE', style: TextStyle(fontSize: 11)),
+    );
+  }
+}
+
+/// Rappel visuel du statut de l'acompte, avec l'action manuelle "encaissé en
+/// magasin" quand le client a choisi ce mode mais n'a pas encore réglé.
+class _DepositBanner extends ConsumerWidget {
+  final RepairOrder order;
+
+  const _DepositBanner({required this.order});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final quote = order.quote!;
+    final amountLabel = quote.depositAmount!
+        .toStringAsFixed(2)
+        .replaceAll('.', ',');
+
+    if (quote.depositStatus == DepositStatus.paid) {
+      return Row(
+        children: [
+          const Icon(
+            Icons.check_circle_rounded,
+            size: 14,
+            color: VoltronColors.success,
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              'Acompte de $amountLabel € payé ${quote.depositMethod == DepositMethod.online ? 'en ligne' : 'en magasin'}',
+              style: const TextStyle(
+                color: VoltronColors.success,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    return Row(
+      children: [
+        const Icon(
+          Icons.hourglass_bottom_rounded,
+          size: 14,
+          color: VoltronColors.warning,
+        ),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            quote.depositMethod == DepositMethod.inStore
+                ? 'Acompte de $amountLabel € — le client réglera en magasin'
+                : 'Acompte de $amountLabel € en attente de paiement',
+            style: const TextStyle(
+              color: VoltronColors.warning,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+        TextButton(
+          onPressed: () => ref
+              .read(repairsProvider.notifier)
+              .markDepositPaidInStore(order.dbId),
+          child: const Text('Marquer payé', style: TextStyle(fontSize: 11)),
+        ),
+      ],
     );
   }
 }

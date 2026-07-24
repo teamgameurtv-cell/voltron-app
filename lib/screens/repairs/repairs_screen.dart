@@ -8,7 +8,7 @@ import '../../providers/repairs_provider.dart';
 import '../../theme/voltron_theme.dart';
 import '../../widgets/app_header.dart';
 import '../../widgets/client_booking_card.dart';
-import '../../widgets/client_repair_order_detail.dart';
+import '../../widgets/client_repair_order_card.dart';
 
 class RepairsScreen extends ConsumerWidget {
   const RepairsScreen({super.key});
@@ -129,10 +129,7 @@ class RepairsScreen extends ConsumerWidget {
               ...orders.map(
                 (order) => Padding(
                   padding: const EdgeInsets.only(bottom: 12),
-                  child: ClientRepairOrderDetail(
-                    order: order,
-                    collapsible: true,
-                  ),
+                  child: ClientRepairOrderCard(order: order),
                 ),
               ),
             if (archivedOrders.isNotEmpty)
@@ -156,10 +153,7 @@ class RepairsScreen extends ConsumerWidget {
                       .map(
                         (order) => Padding(
                           padding: const EdgeInsets.only(bottom: 12),
-                          child: ClientRepairOrderDetail(
-                            order: order,
-                            collapsible: true,
-                          ),
+                          child: ClientRepairOrderCard(order: order),
                         ),
                       )
                       .toList(),

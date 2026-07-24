@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import '../models/repair.dart';
 import '../theme/voltron_theme.dart';
 
-const Map<String, IconData> _stepIcons = {
+/// Icône associée à chaque étape — partagée avec l'écran de suivi client
+/// pour l'icône mise en avant sur la carte "Étape actuelle".
+const Map<String, IconData> stepIcons = {
   'Rendez-vous pris': Icons.event_available_rounded,
   'Trottinette déposée': Icons.electric_scooter,
   'Diagnostic en cours': Icons.troubleshoot_rounded,
@@ -63,7 +65,7 @@ class _StepNode extends StatelessWidget {
       RepairStepStatus.current => VoltronColors.electricYellow,
       RepairStepStatus.pending => VoltronColors.greyText,
     };
-    final icon = _stepIcons[step.label] ?? Icons.circle_outlined;
+    final icon = stepIcons[step.label] ?? Icons.circle_outlined;
 
     return GestureDetector(
       onTap: onTap,

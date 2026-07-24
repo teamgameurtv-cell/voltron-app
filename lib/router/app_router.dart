@@ -14,6 +14,7 @@ import '../screens/repairs/repairs_screen.dart';
 import '../screens/repairs/booking_screen.dart';
 import '../screens/repairs/quote_screen.dart';
 import '../screens/repairs/deposit_payment_screen.dart';
+import '../screens/repairs/client_repair_order_screen.dart';
 import '../screens/loyalty/loyalty_screen.dart';
 import '../screens/loyalty/voltron_care_screen.dart';
 import '../screens/loyalty/care_payment_screen.dart';
@@ -125,6 +126,13 @@ final GoRouter appRouter = GoRouter(
                   path: 'deposit/:orderId',
                   parentNavigatorKey: rootNavigatorKey,
                   builder: (context, state) => DepositPaymentScreen(
+                    orderId: state.pathParameters['orderId']!,
+                  ),
+                ),
+                GoRoute(
+                  path: 'order/:orderId',
+                  parentNavigatorKey: rootNavigatorKey,
+                  builder: (context, state) => ClientRepairOrderScreen(
                     orderId: state.pathParameters['orderId']!,
                   ),
                 ),

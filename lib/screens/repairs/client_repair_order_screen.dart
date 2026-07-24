@@ -36,6 +36,24 @@ const Map<String, String> _stepDescriptions = {
       'Dossier clôturé, votre trottinette vous a été remise. Merci de votre confiance !',
 };
 
+/// Le devis a trois issues possibles, chacune avec une explication et une
+/// action différentes pour le client — un simple libellé fixe ne suffit pas.
+String _currentStepDescription(RepairOrder order) {
+  final step = order.currentStep;
+  if (step.label == 'Devis envoyé') {
+    switch (order.quote?.status) {
+      case QuoteStatus.accepted:
+        return 'Vous avez validé le devis, la réparation va démarrer.';
+      case QuoteStatus.refused:
+        return 'Vous avez refusé ce devis. Notre équipe va vous en proposer '
+            'un nouveau — vous serez prévenu dès qu\'il sera prêt.';
+      default:
+        return _stepDescriptions[step.label] ?? '';
+    }
+  }
+  return _stepDescriptions[step.label] ?? '';
+}
+
 /// Écran plein cadre du suivi de dossier côté client — reprend la maquette :
 /// en-tête avec statut et contact, infos de dépôt/estimation/technicien,
 /// frise d'étapes, étape actuelle détaillée, fiche véhicule, historique et
@@ -126,6 +144,9 @@ class _Header extends StatelessWidget {
     if (isComplete) {
       statusColor = VoltronColors.success;
       statusLabel = 'Terminée';
+    } else if (order.quote?.status == QuoteStatus.refused) {
+      statusColor = const Color(0xFFFF5C5C);
+      statusLabel = 'Devis refusé';
     } else if (order.isBlockedOnQuote) {
       statusColor = VoltronColors.warning;
       statusLabel = 'Devis en attente';
@@ -463,7 +484,7 @@ class _CurrentStepCard extends ConsumerWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            _stepDescriptions[step.label] ?? '',
+            _currentStepDescription(order),
             style: const TextStyle(fontSize: 13, height: 1.4),
           ),
           if (noteTasks.isNotEmpty) ...[

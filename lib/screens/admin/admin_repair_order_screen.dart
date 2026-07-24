@@ -66,27 +66,8 @@ class AdminRepairOrderScreen extends ConsumerWidget {
                 padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
                 children: [
                   RepairStepTracker(steps: order.steps),
-                  if (order.quote?.status == QuoteStatus.accepted) ...[
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.check_circle_rounded,
-                          size: 14,
-                          color: VoltronColors.success,
-                        ),
-                        const SizedBox(width: 6),
-                        const Text(
-                          'Le client a validé le devis',
-                          style: TextStyle(
-                            color: VoltronColors.success,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+                  const SizedBox(height: 12),
+                  _StepGuideCard(order: order),
                   if ((order.quote?.depositAmount ?? 0) > 0) ...[
                     const SizedBox(height: 8),
                     _DepositBanner(order: order),
@@ -227,6 +208,17 @@ class _PrimaryActionButton extends ConsumerWidget {
         ),
       );
     }
+    if (order.quote?.status == QuoteStatus.refused) {
+      return ElevatedButton(
+        onPressed: () =>
+            showQuoteDialog(context, ref, order, existing: order.quote),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: const Color(0xFFFF5C5C),
+          foregroundColor: Colors.white,
+        ),
+        child: const Text('RENVOYER LE DEVIS', style: TextStyle(fontSize: 11)),
+      );
+    }
     if (order.isBlockedOnQuote) {
       return ElevatedButton(
         onPressed: () =>
@@ -248,6 +240,104 @@ class _PrimaryActionButton extends ConsumerWidget {
       onPressed: () =>
           ref.read(repairsProvider.notifier).advanceStep(order.dbId),
       child: const Text('ÉTAPE SUIVANTE', style: TextStyle(fontSize: 11)),
+    );
+  }
+}
+
+/// Instructions en langage clair pour chaque étape — pensées pour qu'un
+/// employé qui découvre l'outil sache quoi faire sans avoir à demander,
+/// sans se soucier de deviner ce qu'implique une étape technique.
+const Map<String, String> _adminStepGuides = {
+  'Rendez-vous pris':
+      'Le client a réservé un créneau de dépôt. Quand il se présente à '
+      'l\'atelier avec sa trottinette, complétez la vérification de dépôt '
+      'ci-dessous puis passez à l\'étape suivante.',
+  'Trottinette déposée':
+      'La trottinette est arrivée à l\'atelier. Terminez la vérification de '
+      'dépôt (freins, pneus, état général...) puis passez à l\'étape '
+      'Diagnostic.',
+  'Diagnostic en cours':
+      'Examinez la trottinette et notez le résultat du diagnostic (avec des '
+      'photos si besoin) dans la checklist ci-dessous, puis envoyez un devis '
+      'au client avec le bouton en haut à droite.',
+  'Pièces commandées':
+      'Commandez les pièces nécessaires à la réparation (onglet "Pièces" en '
+      'bas de l\'écran), puis passez à l\'étape suivante une fois la commande '
+      'passée.',
+  'Réparation en cours':
+      'Effectuez la réparation. Une fois terminée, passez à l\'étape '
+      'suivante.',
+  'Prête à récupérer':
+      'Contactez le client pour qu\'il vienne récupérer sa trottinette en '
+      'boutique.',
+  'Récupérée':
+      'Dossier terminé : la trottinette a été rendue au client. Le dossier '
+      'est archivé automatiquement.',
+};
+
+/// Carte explicative toujours visible sous la frise : dit clairement où en
+/// est le dossier et ce qu'il faut faire — en particulier pour le devis, où
+/// le statut (en attente / validé / refusé) change complètement l'action à
+/// mener, ce qui n'était pas visible auparavant.
+class _StepGuideCard extends StatelessWidget {
+  final RepairOrder order;
+
+  const _StepGuideCard({required this.order});
+
+  @override
+  Widget build(BuildContext context) {
+    if (order.isComplete) return const SizedBox.shrink();
+    final step = order.currentStep;
+    String text;
+    Color color;
+    if (step.label == 'Devis envoyé') {
+      switch (order.quote?.status) {
+        case QuoteStatus.accepted:
+          text =
+              'Le client a validé le devis ! Vous pouvez passer à l\'étape '
+              'suivante.';
+          color = VoltronColors.success;
+          break;
+        case QuoteStatus.refused:
+          text =
+              'Le client a refusé ce devis. Utilisez le bouton "RENVOYER LE '
+              'DEVIS" en haut à droite pour lui proposer une nouvelle offre.';
+          color = const Color(0xFFFF5C5C);
+          break;
+        default:
+          text =
+              'Le devis a été envoyé, en attente de la réponse du client. '
+              'Vous ne pourrez pas avancer tant qu\'il n\'a pas validé (il '
+              'peut aussi régler un éventuel acompte directement en '
+              'boutique).';
+          color = VoltronColors.warning;
+      }
+    } else {
+      text = _adminStepGuides[step.label] ?? '';
+      color = VoltronColors.electricBlueGlow;
+    }
+    if (text.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(VoltronRadii.md),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.info_outline_rounded, size: 16, color: color),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(color: color, fontSize: 12, height: 1.4),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

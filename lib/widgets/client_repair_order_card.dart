@@ -13,12 +13,19 @@ class ClientRepairOrderCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isComplete = order.isComplete;
+    final isRefused = order.quote?.status == QuoteStatus.refused;
     final badgeColor = isComplete
         ? VoltronColors.success
+        : isRefused
+        ? const Color(0xFFFF5C5C)
         : order.isBlockedOnQuote
         ? VoltronColors.warning
         : VoltronColors.electricBlueGlow;
-    final badgeLabel = isComplete ? 'Terminée' : order.currentStep.label;
+    final badgeLabel = isComplete
+        ? 'Terminée'
+        : isRefused
+        ? 'Devis refusé'
+        : order.currentStep.label;
 
     return GestureDetector(
       onTap: () => context.push('/repairs/order/${order.dbId}'),

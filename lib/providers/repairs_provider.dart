@@ -368,7 +368,10 @@ class RepairsNotifier extends StateNotifier<List<RepairOrder>> {
         );
   }
 
-  /// Modifie un devis déjà envoyé (lignes et/ou fichier joint).
+  /// Modifie un devis déjà envoyé (lignes et/ou fichier joint). Si le client
+  /// l'avait refusé, le renvoyer le remet "en attente" et le client est
+  /// prévenu — sinon un devis refusé resterait bloqué sans aucun moyen de
+  /// le corriger depuis l'app.
   Future<void> updateQuote(
     String quoteDbId, {
     required List<QuoteLine> lines,
@@ -377,14 +380,12 @@ class RepairsNotifier extends StateNotifier<List<RepairOrder>> {
     String? note,
     double? depositAmount,
   }) async {
+    final order = state.firstWhere((o) => o.quote?.dbId == quoteDbId);
+    final existingQuote = order.quote;
     // Un acompte déjà payé ne doit pas repasser "en attente" si l'admin
     // modifie juste le devis ensuite (délai, pièce jointe...).
-    final existingQuote = state
-        .map((o) => o.quote)
-        .whereType<Quote>()
-        .where((q) => q.dbId == quoteDbId)
-        .firstOrNull;
     final alreadyPaid = existingQuote?.depositStatus == DepositStatus.paid;
+    final wasRefused = existingQuote?.status == QuoteStatus.refused;
     await _client
         .from('quotes')
         .update({
@@ -395,6 +396,7 @@ class RepairsNotifier extends StateNotifier<List<RepairOrder>> {
           'deposit_status': (depositAmount ?? 0) <= 0
               ? 'none'
               : (alreadyPaid ? 'paid' : 'pending'),
+          if (wasRefused) 'status': 'pendingApproval',
         })
         .eq('id', quoteDbId);
 
@@ -404,6 +406,24 @@ class RepairsNotifier extends StateNotifier<List<RepairOrder>> {
         for (final line in lines)
           {'quote_id': quoteDbId, 'label': line.label, 'price': line.price},
       ]);
+    }
+
+    if (wasRefused) {
+      await logRepairOrderEvent(
+        _client,
+        orderId: order.dbId,
+        actorRole: 'admin',
+        eventType: 'quote_resent',
+        description: 'Devis révisé renvoyé après refus',
+      );
+      ref
+          .read(notificationsProvider.notifier)
+          .notifyClient(
+            order.clientId,
+            type: NotificationType.repair,
+            title: 'Réparation #${order.id}',
+            body: 'Un devis révisé est disponible, merci de le consulter.',
+          );
     }
   }
 
@@ -437,6 +457,12 @@ class RepairsNotifier extends StateNotifier<List<RepairOrder>> {
       eventType: 'quote_accepted',
       description: 'Devis accepté par le client',
     );
+    await notifyAdmin(
+      _client,
+      orderId: orderDbId,
+      title: 'Devis validé — Dossier #${order.id}',
+      body: 'Le client a validé le devis, la réparation peut démarrer.',
+    );
     await advanceStep(orderDbId);
   }
 
@@ -453,6 +479,13 @@ class RepairsNotifier extends StateNotifier<List<RepairOrder>> {
       actorRole: 'client',
       eventType: 'quote_refused',
       description: 'Devis refusé par le client',
+    );
+    await notifyAdmin(
+      _client,
+      orderId: orderDbId,
+      title: 'Devis refusé — Dossier #${order.id}',
+      body:
+          'Le client a refusé le devis. Modifiez-le pour lui renvoyer une nouvelle proposition.',
     );
   }
 

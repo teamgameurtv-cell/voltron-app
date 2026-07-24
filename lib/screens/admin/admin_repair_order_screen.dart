@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../data/repair_step_task_templates.dart';
 import '../../models/repair.dart';
+import '../../models/repair_order_message.dart';
 import '../../models/repair_order_part.dart';
 import '../../models/repair_step_task.dart';
 import '../../models/scooter.dart';
@@ -1744,6 +1745,14 @@ class _BottomActionBar extends ConsumerWidget {
         ref.watch(repairOrderDocumentsProvider(order.dbId)).valueOrNull ?? [];
     final parts =
         ref.watch(repairOrderPartsProvider(order.dbId)).valueOrNull ?? [];
+    final hasUnreadMessage =
+        ref.watch(
+          unreadRepairMessagesCountProvider((
+            order.dbId,
+            RepairMessageSenderRole.admin,
+          )),
+        ) >
+        0;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
@@ -1773,6 +1782,7 @@ class _BottomActionBar extends ConsumerWidget {
             'Messages',
             null,
             () => context.push('/admin/repairs/${order.dbId}/messages'),
+            hasBadge: hasUnreadMessage,
           ),
           _bottomBarItem(
             context,
@@ -1791,8 +1801,9 @@ class _BottomActionBar extends ConsumerWidget {
     IconData icon,
     String label,
     int? count,
-    VoidCallback onTap,
-  ) {
+    VoidCallback onTap, {
+    bool hasBadge = false,
+  }) {
     return Expanded(
       child: InkWell(
         onTap: onTap,
@@ -1801,7 +1812,25 @@ class _BottomActionBar extends ConsumerWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, size: 20, color: VoltronColors.greyText),
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Icon(icon, size: 20, color: VoltronColors.greyText),
+                  if (hasBadge)
+                    Positioned(
+                      right: -4,
+                      top: -2,
+                      child: Container(
+                        width: 9,
+                        height: 9,
+                        decoration: const BoxDecoration(
+                          color: VoltronColors.electricYellow,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
               const SizedBox(height: 2),
               Text(
                 count != null ? '$label ($count)' : label,

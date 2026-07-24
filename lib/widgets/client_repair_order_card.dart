@@ -1,17 +1,28 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../models/repair.dart';
+import '../models/repair_order_message.dart';
+import '../providers/repair_order_detail_provider.dart';
 import '../theme/voltron_theme.dart';
 
 /// Ligne compacte d'un dossier de réparation dans la liste du client — tape
 /// dessus pour ouvrir le suivi complet (voir client_repair_order_screen.dart).
-class ClientRepairOrderCard extends StatelessWidget {
+class ClientRepairOrderCard extends ConsumerWidget {
   final RepairOrder order;
 
   const ClientRepairOrderCard({super.key, required this.order});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final hasUnreadMessage =
+        ref.watch(
+          unreadRepairMessagesCountProvider((
+            order.dbId,
+            RepairMessageSenderRole.client,
+          )),
+        ) >
+        0;
     final isComplete = order.isComplete;
     final isRefused = order.quote?.status == QuoteStatus.refused;
     final badgeColor = isComplete
@@ -37,19 +48,41 @@ class ClientRepairOrderCard extends StatelessWidget {
         ),
         child: Row(
           children: [
-            Container(
-              width: 40,
-              height: 40,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: VoltronColors.deepBlack,
-                borderRadius: BorderRadius.circular(VoltronRadii.sm),
-              ),
-              child: const Icon(
-                Icons.electric_scooter_rounded,
-                color: VoltronColors.electricYellow,
-                size: 20,
-              ),
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: VoltronColors.deepBlack,
+                    borderRadius: BorderRadius.circular(VoltronRadii.sm),
+                  ),
+                  child: const Icon(
+                    Icons.electric_scooter_rounded,
+                    color: VoltronColors.electricYellow,
+                    size: 20,
+                  ),
+                ),
+                if (hasUnreadMessage)
+                  Positioned(
+                    right: -3,
+                    top: -3,
+                    child: Container(
+                      width: 12,
+                      height: 12,
+                      decoration: BoxDecoration(
+                        color: VoltronColors.electricYellow,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: VoltronColors.cardBlack,
+                          width: 2,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
             ),
             const SizedBox(width: 12),
             Expanded(

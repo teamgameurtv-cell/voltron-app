@@ -9,6 +9,7 @@ class RepairOrderMessage {
   final String body;
   final String? attachmentUrl;
   final String? attachmentType;
+  final bool read;
   final DateTime createdAt;
 
   const RepairOrderMessage({
@@ -18,6 +19,7 @@ class RepairOrderMessage {
     required this.body,
     this.attachmentUrl,
     this.attachmentType,
+    this.read = false,
     required this.createdAt,
   });
 
@@ -34,6 +36,7 @@ class RepairOrderMessage {
       body: map['body'] as String? ?? '',
       attachmentUrl: map['attachment_url'] as String?,
       attachmentType: map['attachment_type'] as String?,
+      read: map['read'] as bool? ?? false,
       createdAt: DateTime.parse(map['created_at'] as String),
     );
   }

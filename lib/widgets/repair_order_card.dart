@@ -2,7 +2,9 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/repair.dart';
+import '../models/repair_order_message.dart';
 import '../providers/admin_crm_provider.dart';
+import '../providers/repair_order_detail_provider.dart';
 import '../providers/repairs_provider.dart';
 import '../theme/voltron_theme.dart';
 
@@ -18,6 +20,14 @@ class RepairOrderCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final client = ref.watch(clientByIdProvider(order.clientId)).valueOrNull;
+    final hasUnreadMessage =
+        ref.watch(
+          unreadRepairMessagesCountProvider((
+            order.dbId,
+            RepairMessageSenderRole.admin,
+          )),
+        ) >
+        0;
     final isComplete = order.isComplete;
     final isRefused = order.quote?.status == QuoteStatus.refused;
     final badgeColor = isComplete
@@ -45,19 +55,41 @@ class RepairOrderCard extends ConsumerWidget {
       ),
       child: Row(
         children: [
-          Container(
-            width: 40,
-            height: 40,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: VoltronColors.deepBlack,
-              borderRadius: BorderRadius.circular(VoltronRadii.sm),
-            ),
-            child: const Icon(
-              Icons.electric_scooter_rounded,
-              color: VoltronColors.electricYellow,
-              size: 20,
-            ),
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: VoltronColors.deepBlack,
+                  borderRadius: BorderRadius.circular(VoltronRadii.sm),
+                ),
+                child: const Icon(
+                  Icons.electric_scooter_rounded,
+                  color: VoltronColors.electricYellow,
+                  size: 20,
+                ),
+              ),
+              if (hasUnreadMessage)
+                Positioned(
+                  right: -3,
+                  top: -3,
+                  child: Container(
+                    width: 12,
+                    height: 12,
+                    decoration: BoxDecoration(
+                      color: VoltronColors.electricYellow,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: VoltronColors.cardBlack,
+                        width: 2,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
           ),
           const SizedBox(width: 12),
           Expanded(

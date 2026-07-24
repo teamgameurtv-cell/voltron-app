@@ -1192,8 +1192,10 @@ create table if not exists repair_order_messages (
   body text not null default '',
   attachment_url text,
   attachment_type text,
+  read boolean not null default false,
   created_at timestamptz not null default now()
 );
+alter table repair_order_messages add column if not exists read boolean not null default false;
 alter table repair_order_messages enable row level security;
 
 drop policy if exists "repair_order_messages_select_own_or_admin" on repair_order_messages;
@@ -1202,6 +1204,12 @@ create policy "repair_order_messages_select_own_or_admin" on repair_order_messag
 );
 drop policy if exists "repair_order_messages_insert_own_or_admin" on repair_order_messages;
 create policy "repair_order_messages_insert_own_or_admin" on repair_order_messages for insert with check (
+  is_admin() or exists (select 1 from repair_orders o where o.id = order_id and o.client_id = auth.uid())
+);
+drop policy if exists "repair_order_messages_update_own_or_admin" on repair_order_messages;
+create policy "repair_order_messages_update_own_or_admin" on repair_order_messages for update using (
+  is_admin() or exists (select 1 from repair_orders o where o.id = order_id and o.client_id = auth.uid())
+) with check (
   is_admin() or exists (select 1 from repair_orders o where o.id = order_id and o.client_id = auth.uid())
 );
 

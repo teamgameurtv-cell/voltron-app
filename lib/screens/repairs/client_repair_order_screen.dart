@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../models/repair.dart';
+import '../../models/repair_order_message.dart';
 import '../../models/repair_order_photo.dart';
 import '../../models/repair_step_task.dart';
 import '../../models/scooter.dart';
@@ -100,7 +101,7 @@ class ClientRepairOrderScreen extends ConsumerWidget {
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
                 children: [
-                  _InfoRow(order: order),
+                  _VehicleCard(order: order),
                   const SizedBox(height: 24),
                   const Text(
                     'SUIVI DE VOTRE DOSSIER',
@@ -116,7 +117,7 @@ class ClientRepairOrderScreen extends ConsumerWidget {
                   const SizedBox(height: 20),
                   _CurrentStepCard(order: order),
                   const SizedBox(height: 16),
-                  _VehicleInfoCard(order: order),
+                  _DropoffCheckCard(order: order),
                   const SizedBox(height: 16),
                   _HistoryCard(order: order),
                   const SizedBox(height: 16),
@@ -235,13 +236,13 @@ class _Header extends StatelessWidget {
   }
 }
 
-/// Vignette véhicule + statistiques disponibles (dépôt, estimation du devis,
-/// technicien assigné) — chaque statistique n'apparaît que si la donnée
-/// correspondante existe réellement, sans rien inventer.
-class _InfoRow extends ConsumerWidget {
+/// Fiche véhicule tout en haut du dossier : photo + caractéristiques (marque,
+/// n° de série, kilométrage...) regroupées avec les infos de dépôt/estimation/
+/// technicien quand elles existent, plutôt que dispersées sur la page.
+class _VehicleCard extends ConsumerWidget {
   final RepairOrder order;
 
-  const _InfoRow({required this.order});
+  const _VehicleCard({required this.order});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -290,50 +291,94 @@ class _InfoRow extends ConsumerWidget {
     }
 
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: VoltronColors.cardBlack,
         borderRadius: BorderRadius.circular(VoltronRadii.md),
       ),
-      child: Row(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 56,
-            height: 56,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: VoltronColors.deepBlack,
-              borderRadius: BorderRadius.circular(VoltronRadii.sm),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 56,
+                height: 56,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: VoltronColors.deepBlack,
+                  borderRadius: BorderRadius.circular(VoltronRadii.sm),
+                ),
+                child: (scooter?.imageUrl ?? '').isNotEmpty
+                    ? ClipRRect(
+                        borderRadius: BorderRadius.circular(VoltronRadii.sm),
+                        child: Image.network(
+                          scooter!.imageUrl!,
+                          width: 56,
+                          height: 56,
+                          fit: BoxFit.cover,
+                        ),
+                      )
+                    : const Icon(
+                        Icons.electric_scooter_rounded,
+                        color: VoltronColors.electricYellow,
+                        size: 26,
+                      ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      scooter != null
+                          ? '${scooter.brand} ${scooter.model}'
+                          : order.scooterName,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 15,
+                      ),
+                    ),
+                    if (scooter != null && scooter.serialNumber.isNotEmpty)
+                      Text(
+                        'N° ${scooter.serialNumber}',
+                        style: const TextStyle(
+                          color: VoltronColors.electricYellow,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          if (scooter != null) ...[
+            const SizedBox(height: 12),
+            _InfoLine('Kilométrage', '${scooter.mileageKm} km'),
+            if (scooter.batterySpec.isNotEmpty)
+              _InfoLine('Batterie', scooter.batterySpec),
+            if (scooter.color.isNotEmpty) _InfoLine('Couleur', scooter.color),
+          ],
+          const SizedBox(height: 8),
+          GestureDetector(
+            onTap: () => context.push('/account/garage'),
+            child: const Text(
+              'Voir la fiche complète',
+              style: TextStyle(
+                color: VoltronColors.electricBlueGlow,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
             ),
-            child: (scooter?.imageUrl ?? '').isNotEmpty
-                ? ClipRRect(
-                    borderRadius: BorderRadius.circular(VoltronRadii.sm),
-                    child: Image.network(
-                      scooter!.imageUrl!,
-                      width: 56,
-                      height: 56,
-                      fit: BoxFit.cover,
-                    ),
-                  )
-                : const Icon(
-                    Icons.electric_scooter_rounded,
-                    color: VoltronColors.electricYellow,
-                    size: 26,
-                  ),
           ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: stats.isEmpty
-                ? const Text(
-                    'Informations à venir',
-                    style: TextStyle(
-                      color: VoltronColors.greyText,
-                      fontSize: 12,
-                    ),
-                  )
-                : Wrap(spacing: 18, runSpacing: 10, children: stats),
-          ),
+          if (stats.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            const Divider(color: Colors.white12, height: 1),
+            const SizedBox(height: 12),
+            Wrap(spacing: 18, runSpacing: 10, children: stats),
+          ],
         ],
       ),
     );
@@ -437,14 +482,20 @@ class _CurrentStepCard extends ConsumerWidget {
               .where((p) => photoTaskIds.contains(p.stepTaskId))
               .toList();
 
+    // Une fois la trottinette prête (ou rendue), l'étape actuelle bascule au
+    // vert : c'est une bonne nouvelle, pas juste une étape en cours.
+    final isGoodNews =
+        step.label == 'Prête à récupérer' || step.label == 'Récupérée';
+    final themeColor = isGoodNews
+        ? VoltronColors.success
+        : VoltronColors.electricYellow;
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: VoltronColors.electricYellow.withValues(alpha: 0.08),
+        color: themeColor.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(VoltronRadii.md),
-        border: Border.all(
-          color: VoltronColors.electricYellow.withValues(alpha: 0.35),
-        ),
+        border: Border.all(color: themeColor.withValues(alpha: 0.35)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -456,22 +507,22 @@ class _CurrentStepCard extends ConsumerWidget {
                 height: 32,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: VoltronColors.electricYellow.withValues(alpha: 0.15),
+                  color: themeColor.withValues(alpha: 0.15),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
                   stepIcons[step.label] ?? Icons.circle_outlined,
-                  color: VoltronColors.electricYellow,
+                  color: themeColor,
                   size: 16,
                 ),
               ),
               const SizedBox(width: 10),
-              const Text(
+              Text(
                 'ÉTAPE ACTUELLE',
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w800,
-                  color: VoltronColors.electricYellow,
+                  color: themeColor,
                   letterSpacing: 0.5,
                 ),
               ),
@@ -538,14 +589,20 @@ class _CurrentStepCard extends ConsumerWidget {
   }
 }
 
-class _VehicleInfoCard extends ConsumerWidget {
+/// Vérification rapide faite par l'atelier à la prise en charge du véhicule
+/// (freins, pneus, état général...) — visible du client dès que l'admin l'a
+/// renseignée, avec sa note éventuelle pour expliquer un point particulier.
+class _DropoffCheckCard extends ConsumerWidget {
   final RepairOrder order;
 
-  const _VehicleInfoCard({required this.order});
+  const _DropoffCheckCard({required this.order});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final scooter = _resolveScooter(ref, order);
+    final checks =
+        ref.watch(dropoffChecksProvider(order.dbId)).valueOrNull ?? [];
+    final note = order.dropoffClientNote ?? '';
+    if (checks.isEmpty && note.trim().isEmpty) return const SizedBox.shrink();
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -557,7 +614,7 @@ class _VehicleInfoCard extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'INFORMATIONS SUR VOTRE TROTTINETTE',
+            'VÉRIFICATION AU DÉPÔT',
             style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w800,
@@ -565,29 +622,45 @@ class _VehicleInfoCard extends ConsumerWidget {
               letterSpacing: 0.5,
             ),
           ),
-          const SizedBox(height: 12),
-          if (scooter != null) ...[
-            _InfoLine('Marque / Modèle', '${scooter.brand} ${scooter.model}'),
-            if (scooter.serialNumber.isNotEmpty)
-              _InfoLine('N° de série', scooter.serialNumber),
-            _InfoLine('Kilométrage', '${scooter.mileageKm} km'),
-            if (scooter.batterySpec.isNotEmpty)
-              _InfoLine('Batterie', scooter.batterySpec),
-            if (scooter.color.isNotEmpty) _InfoLine('Couleur', scooter.color),
-          ] else
-            _InfoLine('Véhicule', order.scooterName),
-          const SizedBox(height: 8),
-          GestureDetector(
-            onTap: () => context.push('/account/garage'),
-            child: const Text(
-              'Voir la fiche complète',
-              style: TextStyle(
-                color: VoltronColors.electricBlueGlow,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
+          const SizedBox(height: 10),
+          ...checks.map(
+            (c) => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                children: [
+                  Icon(
+                    c.done
+                        ? Icons.check_circle_rounded
+                        : Icons.radio_button_unchecked_rounded,
+                    size: 16,
+                    color: c.done
+                        ? VoltronColors.success
+                        : VoltronColors.greyText,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    c.label,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: c.done ? Colors.white : VoltronColors.greyText,
+                      decoration: c.done ? TextDecoration.lineThrough : null,
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
+          if (note.trim().isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              note.trim(),
+              style: const TextStyle(
+                color: VoltronColors.electricBlueGlow,
+                fontSize: 12,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -803,18 +876,30 @@ class _HistoryRow extends ConsumerWidget {
   }
 }
 
-class _HelpCard extends StatelessWidget {
+class _HelpCard extends ConsumerWidget {
   final String orderId;
 
   const _HelpCard({required this.orderId});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final unread = ref.watch(
+      unreadRepairMessagesCountProvider((
+        orderId,
+        RepairMessageSenderRole.client,
+      )),
+    );
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: VoltronColors.cardBlack,
         borderRadius: BorderRadius.circular(VoltronRadii.md),
+        border: unread > 0
+            ? Border.all(
+                color: VoltronColors.electricYellow.withValues(alpha: 0.4),
+              )
+            : null,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -828,11 +913,42 @@ class _HelpCard extends StatelessWidget {
             'Notre équipe est à votre disposition pour répondre à toutes vos questions.',
             style: TextStyle(color: VoltronColors.greyText, fontSize: 12),
           ),
+          if (unread > 0) ...[
+            const SizedBox(height: 8),
+            Text(
+              unread == 1
+                  ? 'Nouveau message du magasin'
+                  : '$unread nouveaux messages du magasin',
+              style: const TextStyle(
+                color: VoltronColors.electricYellow,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
           const SizedBox(height: 12),
-          OutlinedButton.icon(
-            onPressed: () => context.push('/repairs/messages/$orderId'),
-            icon: const Icon(Icons.chat_bubble_outline_rounded, size: 16),
-            label: const Text('Envoyer un message'),
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              OutlinedButton.icon(
+                onPressed: () => context.push('/repairs/messages/$orderId'),
+                icon: const Icon(Icons.chat_bubble_outline_rounded, size: 16),
+                label: const Text('Envoyer un message'),
+              ),
+              if (unread > 0)
+                Positioned(
+                  right: -4,
+                  top: -4,
+                  child: Container(
+                    width: 10,
+                    height: 10,
+                    decoration: const BoxDecoration(
+                      color: VoltronColors.electricYellow,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+            ],
           ),
         ],
       ),

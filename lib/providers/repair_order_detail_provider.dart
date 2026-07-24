@@ -80,6 +80,22 @@ final repairOrderMessagesProvider =
           );
     });
 
+/// Nombre de messages envoyés par l'autre partie et pas encore lus par
+/// [viewerRole] — utilisé pour afficher un petit indicateur "nouveau message"
+/// sur les boutons/cartes du dossier sans avoir à ouvrir le fil.
+final unreadRepairMessagesCountProvider =
+    Provider.family<int, (String orderId, RepairMessageSenderRole viewerRole)>((
+      ref,
+      args,
+    ) {
+      final (orderId, viewerRole) = args;
+      final messages =
+          ref.watch(repairOrderMessagesProvider(orderId)).valueOrNull ?? [];
+      return messages
+          .where((m) => m.senderRole != viewerRole && !m.read)
+          .length;
+    });
+
 final dropoffChecksProvider =
     StreamProvider.family<List<RepairOrderDropoffCheck>, String>((
       ref,
@@ -256,6 +272,21 @@ class RepairOrderDetailActions {
       'attachment_url': attachmentUrl,
       'attachment_type': attachmentType,
     });
+  }
+
+  /// Marque comme lus les messages envoyés par l'autre partie, quand
+  /// [viewerRole] ouvre le fil — c'est ce qui fait disparaître le badge
+  /// "nouveau message" une fois consulté.
+  Future<void> markMessagesRead(
+    String orderId,
+    RepairMessageSenderRole viewerRole,
+  ) async {
+    await _client
+        .from('repair_order_messages')
+        .update({'read': true})
+        .eq('order_id', orderId)
+        .neq('sender_role', viewerRole.name)
+        .eq('read', false);
   }
 
   Future<(String, String)> uploadMessageAttachment(

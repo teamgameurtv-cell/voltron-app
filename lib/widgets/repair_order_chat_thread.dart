@@ -30,6 +30,16 @@ class _RepairOrderChatThreadState extends ConsumerState<RepairOrderChatThread> {
   bool _isSending = false;
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref
+          .read(repairOrderDetailActionsProvider)
+          .markMessagesRead(widget.orderId, widget.myRole);
+    });
+  }
+
+  @override
   void dispose() {
     _bodyController.dispose();
     _scrollController.dispose();
